@@ -13,7 +13,7 @@ export const THEME = {
   accent: '#7c9cff',
 };
 
-export const EFFECT_MS = { pop: 220, tracer: 140, fade: 260 };
+export const EFFECT_MS = { pop: 220, tracer: 140, fade: 260, flight: 200, landing: 260, confetti: 1800, shake: 420 };
 
 export interface Pop {
   cell: number;
@@ -34,10 +34,43 @@ export interface Fade {
   t: number;
 }
 
+/** A deployed shooter flying from its queue tile or buffer slot to the track entry. */
+export interface Flight {
+  from: Point;
+  to: Point;
+  size: number;
+  color: number;
+  t: number;
+}
+
+/** A shooter arriving in a buffer slot. */
+export interface Landing {
+  slot: number;
+  t: number;
+}
+
+export interface Confetti {
+  x: number;
+  y: number;
+  /** Velocity in px per ms. */
+  vx: number;
+  vy: number;
+  size: number;
+  color: number;
+  t: number;
+}
+
 export interface Effects {
   pops: Pop[];
   tracers: Tracer[];
   fades: Fade[];
+  flights: Flight[];
+  landings: Landing[];
+  confetti: Confetti[];
+}
+
+export function noEffects(): Effects {
+  return { pops: [], tracers: [], fades: [], flights: [], landings: [], confetti: [] };
 }
 
 export interface Overlay {
@@ -46,7 +79,14 @@ export interface Overlay {
   flashUntil: number;
   /** Pick Any is armed: highlight shooters that can be picked from behind the front. */
   pickAny: boolean;
+  /** Shake the scene until this time (a lost level). */
+  shakeUntil: number;
 }
+
+const CONFETTI_GRAVITY = 0.0011;
+const easeOut = (k: number): number => 1 - (1 - k) ** 3;
+/** Overshoots slightly before settling, for things popping into place. */
+const easeOutBack = (k: number): number => 1 + 2.7 * (k - 1) ** 3 + 1.7 * (k - 1) ** 2;
 
 export function draw(
   ctx: CanvasRenderingContext2D,
@@ -63,6 +103,11 @@ export function draw(
 
   ctx.fillStyle = THEME.bg;
   ctx.fillRect(0, 0, layout.width, layout.height);
+  ctx.save();
+  if (now < overlay.shakeUntil) {
+    const amp = 7 * ((overlay.shakeUntil - now) / EFFECT_MS.shake);
+    ctx.translate(Math.sin(now / 22) * amp, Math.cos(now / 31) * amp * 0.5);
+  }
 
   // Track band and board background
   ctx.fillStyle = THEME.band;
@@ -134,8 +179,20 @@ export function draw(
     ctx.beginPath();
     ctx.roundRect(r.x, r.y, r.w, r.h, 8);
     ctx.fill();
-    if (s) drawToken(ctx, { x: r.x + r.w / 2, y: r.y + r.h / 2 }, r.w * 0.78, palette[s.color]!, String(s.ammo));
+    if (!s) return;
+    const landing = effects.landings.find((l) => l.slot === i);
+    const k = landing ? Math.min(1, (now - landing.t) / EFFECT_MS.landing) : 1;
+    const size = r.w * 0.78 * (0.4 + 0.6 * easeOutBack(k));
+    drawToken(ctx, { x: r.x + r.w / 2, y: r.y + r.h / 2 }, size, palette[s.color]!, String(s.ammo));
   });
+
+  for (const f of effects.flights) {
+    const k = (now - f.t) / EFFECT_MS.flight;
+    if (k >= 1) continue;
+    const e = easeOut(Math.max(0, k));
+    const at = { x: f.from.x + (f.to.x - f.from.x) * e, y: f.from.y + (f.to.y - f.from.y) * e };
+    drawToken(ctx, at, f.size + (layout.token - f.size) * e, palette[f.color]!, '');
+  }
 
   ctx.font = `600 13px system-ui, sans-serif`;
   ctx.textAlign = 'center';
@@ -154,6 +211,16 @@ export function draw(
   }
 
   drawQueue(ctx, state, layout, overlay.pickAny);
+
+  for (const c of effects.confetti) {
+    const dt = now - c.t;
+    if (dt < 0 || dt > EFFECT_MS.confetti) continue;
+    ctx.globalAlpha = Math.min(1, 2 * (1 - dt / EFFECT_MS.confetti));
+    ctx.fillStyle = palette[c.color]!;
+    ctx.fillRect(c.x + c.vx * dt, c.y + c.vy * dt + 0.5 * CONFETTI_GRAVITY * dt * dt, c.size, c.size);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
 
   if (overlay.paused) {
     ctx.fillStyle = 'rgba(10,12,16,0.6)';

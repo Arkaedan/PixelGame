@@ -10,8 +10,10 @@ import {
   type PowerUpKind,
 } from '../core/index.ts';
 import { totalPowerUps, type ClearRecord, type ProgressStore } from '../storage/progress.ts';
-import { cellCentre, computeLayout, contains, queueTiles, type Layout } from './layout.ts';
-import { draw, EFFECT_MS, type Effects } from './render.ts';
+import type { Settings } from '../storage/settings.ts';
+import type { Sfx } from './audio.ts';
+import { cellCentre, computeLayout, contains, queueTiles, type Layout, type Point } from './layout.ts';
+import { draw, EFFECT_MS, noEffects, type Effects } from './render.ts';
 import { describePowerUps, escapeHtml, formatDuration, plural, POWER_UP_NAMES } from './text.ts';
 
 /** Simulation step length at 1× speed. A 24×24 lap (100 positions) takes about 8 s. */
@@ -24,6 +26,8 @@ export interface GameScreenOptions {
   levelNumber: number;
   hasNext: boolean;
   progress: ProgressStore;
+  settings: Settings;
+  sfx: Sfx;
   onExit: () => void;
   onNext: () => void;
 }
@@ -43,12 +47,13 @@ export class GameScreen {
 
   private state!: GameState;
   private layout!: Layout;
-  private effects: Effects = { pops: [], tracers: [], fades: [] };
-  private speed = 0;
+  private effects: Effects = noEffects();
+  private speed: number;
   private paused = false;
   /** Pick Any is armed: the next queue tap may take any visible shooter. */
   private picking = false;
   private flashUntil = 0;
+  private shakeUntil = 0;
   private acc = 0;
   private last = 0;
   private frame = 0;
@@ -57,13 +62,14 @@ export class GameScreen {
   constructor(container: HTMLElement, level: Level, options: GameScreenOptions) {
     this.level = level;
     this.options = options;
+    this.speed = Math.max(0, SPEEDS.indexOf(options.settings.speed));
     this.root = document.createElement('div');
     this.root.className = 'game';
     this.root.innerHTML = `
       <header class="hud">
         <button class="icon" data-act="back" aria-label="Levels">‹</button>
         <div class="title"><span class="num">${options.levelNumber}</span> ${escapeHtml(level.name)}</div>
-        <button class="icon speed" data-act="speed" aria-label="Speed">1×</button>
+        <button class="icon speed" data-act="speed" aria-label="Speed">${SPEEDS[this.speed]}×</button>
         <button class="icon" data-act="pause" aria-label="Pause">❚❚</button>
         <button class="icon" data-act="restart" aria-label="Restart">↻</button>
       </header>
@@ -103,6 +109,8 @@ export class GameScreen {
       else if (act === 'levels') this.options.onExit();
     });
     this.canvas.addEventListener('pointerdown', (e) => this.onTap(e.offsetX, e.offsetY));
+    // Browsers only allow audio after a user gesture.
+    this.root.addEventListener('pointerdown', () => this.options.sfx.unlock());
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.canvas);
@@ -127,7 +135,8 @@ export class GameScreen {
   private restart(): void {
     clearTimeout(this.resultTimer);
     this.state = createGame(this.level);
-    this.effects = { pops: [], tracers: [], fades: [] };
+    this.effects = noEffects();
+    this.shakeUntil = 0;
     this.acc = 0;
     this.picking = false;
     this.resultEl.hidden = true;
@@ -161,8 +170,12 @@ export class GameScreen {
     if (this.paused || this.state.status !== 'playing') return;
     if (act === 'pickAny') {
       this.picking = !this.picking;
+      this.options.sfx.play('deploy');
     } else if (act === 'extraSlot' || act === 'reveal') {
-      if (applyAction(this.state, { type: 'powerUp', kind: act }).ok) vibrate(8);
+      if (applyAction(this.state, { type: 'powerUp', kind: act }).ok) {
+        this.options.sfx.play('powerUp');
+        this.buzz(8);
+      }
     }
     this.updatePowerUpBar();
   }
@@ -184,25 +197,58 @@ export class GameScreen {
     if (this.paused || this.state.status !== 'playing' || !this.layout) return;
     const p = { x, y };
     let action: Action | undefined;
+    // Where the deployed shooter's token flies from, and how big it starts.
+    let from: { at: Point; size: number } | undefined;
     const slot = this.layout.buffer.findIndex((r) => contains(r, p));
-    if (slot !== -1) action = { type: 'deployBuffer', slot };
+    if (slot !== -1) {
+      action = { type: 'deployBuffer', slot };
+      const r = this.layout.buffer[slot]!;
+      from = { at: { x: r.x + r.w / 2, y: r.y + r.h / 2 }, size: r.w * 0.78 };
+    }
     const column = this.layout.columns.findIndex((r) => contains(r, p));
     if (column !== -1) {
-      const tile = this.picking
-        ? queueTiles(this.layout, this.state).tiles.find((t) => contains(t.rect, p))
-        : undefined;
-      action = tile ? { type: 'deployQueue', column: tile.column, index: tile.index } : { type: 'deployQueue', column };
+      const tiles = queueTiles(this.layout, this.state).tiles;
+      const picked = this.picking ? tiles.find((t) => contains(t.rect, p)) : undefined;
+      action = picked
+        ? { type: 'deployQueue', column: picked.column, index: picked.index }
+        : { type: 'deployQueue', column };
+      const tile = picked ?? tiles.find((t) => t.column === column && t.index === 0);
+      if (tile) {
+        from = { at: { x: tile.rect.x + tile.rect.w / 2, y: tile.rect.y + tile.rect.h / 2 }, size: tile.rect.h * 0.8 };
+      }
     }
     if (!action) return;
 
     const result = applyAction(this.state, action);
     if (result.ok) {
-      vibrate(8);
+      const shooter = this.state.pending.at(-1);
+      if (from && shooter) {
+        const now = performance.now();
+        this.effects.flights.push({
+          from: from.at,
+          to: this.layout.track[0]!,
+          size: from.size,
+          color: shooter.color,
+          t: now,
+        });
+      }
+      this.options.sfx.play('deploy');
+      this.buzz(8);
       if (action.type === 'deployQueue') this.picking = false;
       this.updatePowerUpBar();
     } else if (result.error === 'track-full') {
       this.flashUntil = performance.now() + 600;
-      vibrate([20, 40, 20]);
+      this.options.sfx.play('reject');
+      this.buzz([20, 40, 20]);
+    }
+  }
+
+  private buzz(pattern: number | number[]): void {
+    if (!this.options.settings.haptics) return;
+    try {
+      navigator.vibrate?.(pattern);
+    } catch {
+      // Not supported (e.g. desktop or iOS); haptics are optional.
     }
   }
 
@@ -223,6 +269,7 @@ export class GameScreen {
         paused: this.paused,
         flashUntil: this.flashUntil,
         pickAny: this.picking,
+        shakeUntil: this.shakeUntil,
       });
     }
     this.frame = requestAnimationFrame(this.tick);
@@ -233,6 +280,7 @@ export class GameScreen {
     for (const e of events) {
       switch (e.type) {
         case 'shot':
+          this.options.sfx.play('shot', e.color);
           this.effects.pops.push({ cell: e.cell, color: e.color, t: now });
           if (layout) {
             this.effects.tracers.push({
@@ -244,17 +292,27 @@ export class GameScreen {
           }
           break;
         case 'exhausted': {
+          this.options.sfx.play('empty');
           const at = layout?.track[e.pos];
           if (at) this.effects.fades.push({ at, color: e.color, t: now });
           break;
         }
+        case 'buffered':
+          this.options.sfx.play('buffered');
+          this.effects.landings = this.effects.landings.filter((l) => l.slot !== e.slot);
+          this.effects.landings.push({ slot: e.slot, t: now });
+          break;
         case 'won':
-          vibrate([30, 60, 30]);
+          this.options.sfx.play('win');
+          this.buzz([30, 60, 30]);
           this.picking = false;
+          this.launchConfetti(now);
           this.showWin();
           break;
         case 'lost':
-          vibrate(120);
+          this.options.sfx.play('lose');
+          this.buzz(120);
+          this.shakeUntil = now + EFFECT_MS.shake;
           this.picking = false;
           this.showLoss(
             e.reason === 'overflow' ? 'Buffer overflow' : 'Out of moves',
@@ -274,6 +332,27 @@ export class GameScreen {
     if (fx.pops.length) fx.pops = fx.pops.filter((p) => now - p.t < EFFECT_MS.pop);
     if (fx.tracers.length) fx.tracers = fx.tracers.filter((t) => now - t.t < EFFECT_MS.tracer);
     if (fx.fades.length) fx.fades = fx.fades.filter((f) => now - f.t < EFFECT_MS.fade);
+    if (fx.flights.length) fx.flights = fx.flights.filter((f) => now - f.t < EFFECT_MS.flight);
+    if (fx.landings.length) fx.landings = fx.landings.filter((l) => now - l.t < EFFECT_MS.landing);
+    if (fx.confetti.length) fx.confetti = fx.confetti.filter((c) => now - c.t < EFFECT_MS.confetti);
+  }
+
+  /** A burst of pixels in the level's colours, from the top of the board. */
+  private launchConfetti(now: number): void {
+    if (!this.layout) return;
+    const { board } = this.layout;
+    const colours = this.level.palette.length;
+    for (let i = 0; i < 90; i++) {
+      this.effects.confetti.push({
+        x: board.x + board.w * (0.2 + 0.6 * Math.random()),
+        y: board.y + board.h * 0.35,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: -0.25 - Math.random() * 0.45,
+        size: 3 + Math.random() * 4,
+        color: i % colours,
+        t: now + Math.random() * 120,
+      });
+    }
   }
 
   private showWin(): void {
@@ -335,14 +414,6 @@ const POWER_UP_ICONS: Record<PowerUpKind, string> = {
 function summarise(record: ClearRecord): string {
   const total = totalPowerUps(record);
   return `${total ? plural(total, 'power-up') : 'Perfect'} in ${formatDuration(record.ticks * TICK_MS)}`;
-}
-
-function vibrate(pattern: number | number[]): void {
-  try {
-    navigator.vibrate?.(pattern);
-  } catch {
-    // Not supported (e.g. desktop or iOS); haptics are optional.
-  }
 }
 
 /** The `data-act` value of the button (or its child) that was clicked. */

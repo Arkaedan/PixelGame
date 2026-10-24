@@ -186,17 +186,30 @@ A separate page, not shipped in the game: import a PNG or draw a grid, generate,
 
 Other screens: **Level select** (numbered tiles with badges), **Result** (clear or fail, power-ups used compared with your best, Retry / Next), **Settings** (sound, haptics, default speed).
 
-Feel: pixel "pop" particles, shot tracer, haptic tick on hits (`navigator.vibrate` on Android), simple Web Audio sounds.
+Feel (milestone 5):
+
+- **Effects:**
+  - Each hit draws a tracer to the pixel, and the pixel shrinks away.
+  - Deployed shooters fly from their tile or buffer slot to the entry.
+  - Buffered shooters pop into their slot.
+  - Shooters that run out of ammo grow and fade.
+  - Winning bursts confetti in the level's colours, and losing shakes the screen.
+  - Cards pop in and level tiles rise in. All CSS animation is off when the device asks for reduced motion.
+- **Sound** is synthesised with Web Audio, with no audio files:
+  - each hit plays a pentatonic note chosen by colour, at most one per 35 ms;
+  - deploy, run-out, buffer, reject, power-up, win and lose each have their own sound.
+- **Haptics:** short `navigator.vibrate` pulses on deploy, a full track, power-ups, a win and a loss.
+- **Settings** (⚙ on the level list, saved as `pixelgame.settings.v1`): sound on or off, vibration on or off, and the speed a level starts at (1×, 2× or 4×).
 
 ---
 
 ## 8. Tech stack
 
 - **TypeScript + Vite**, rendering with **HTML Canvas 2D** (no engine; 3,600 rectangles plus a few sprites is light work).
-- **PWA** via `vite-plugin-pwa`: installable from Chrome on Android, full-screen, works offline.
+- **PWA** via `vite-plugin-pwa`: installable from Chrome on Android, full-screen, portrait, works offline. The service worker caches every built file and updates itself when a new version is deployed. `pnpm icons` draws the icons, including a maskable one.
 - **Vitest** for simulation and level-verification tests.
 - **Node CLI** for the generator and solver, sharing the core simulation code.
-- Hosting on **GitHub Pages**. Installing as a PWA needs HTTPS. During development, test on the phone over Wi-Fi with `vite --host`.
+- Hosting on **GitHub Pages** at `/PixelGame/`. Installing as a PWA needs HTTPS. `.github/workflows/deploy.yml` runs `pnpm check`, builds, and deploys on every push to `main`. During development, test on the phone over Wi-Fi with `pnpm dev`.
 - Optional later: wrap with **Capacitor** to get an APK or Play Store build.
 
 ### Project structure

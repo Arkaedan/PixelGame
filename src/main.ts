@@ -1,12 +1,16 @@
 import './style.css';
 import type { Level } from './core/index.ts';
 import { LEVELS } from './game/levels.ts';
+import { Sfx } from './game/audio.ts';
 import { GameScreen } from './game/screen.ts';
 import { escapeHtml, plural } from './game/text.ts';
 import { ProgressStore, totalPowerUps } from './storage/progress.ts';
+import { SettingsStore, type Settings } from './storage/settings.ts';
 
 const app = document.querySelector<HTMLElement>('#app')!;
 const progress = ProgressStore.browser();
+const settings = SettingsStore.browser();
+const sfx = new Sfx(settings.get().sound);
 const levelIds = LEVELS.map((l) => l.id);
 /** `?all` in the URL opens every level, for testing. */
 const unlockAll = new URLSearchParams(location.search).has('all');
@@ -19,7 +23,10 @@ function showMenu(): void {
   current = undefined;
   app.innerHTML = `
     <main class="menu">
-      <h1>PixelGame</h1>
+      <header class="menu-head">
+        <h1>PixelGame</h1>
+        <button class="icon" data-act="settings" aria-label="Settings">⚙</button>
+      </header>
       <div class="levels">
         ${LEVELS.map((level, i) => {
           const locked = !isUnlocked(i);
@@ -40,6 +47,7 @@ function showMenu(): void {
         }).join('')}
       </div>
     </main>`;
+  app.querySelector('[data-act="settings"]')!.addEventListener('click', showSettings);
   app.querySelectorAll<HTMLButtonElement>('.level').forEach((btn) => {
     const i = Number(btn.dataset['index']);
     drawThumbnail(btn.querySelector('canvas')!, LEVELS[i]!, btn.disabled);
@@ -58,12 +66,62 @@ function play(index: number): void {
     levelNumber: index + 1,
     hasNext: index + 1 < LEVELS.length,
     progress,
+    settings: settings.get(),
+    sfx,
     onExit: () => history.back(),
     onNext: () => {
       history.replaceState({ level: index + 1 }, '');
       play(index + 1);
     },
   });
+}
+
+/** A sheet over the level list with sound, vibration and starting speed. */
+function showSettings(): void {
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  const render = (s: Settings): void => {
+    const toggle = (key: 'sound' | 'haptics', label: string): string => `
+      <label class="row">
+        <span>${label}</span>
+        <input type="checkbox" data-key="${key}" ${s[key] ? 'checked' : ''} />
+      </label>`;
+    sheet.innerHTML = `
+      <div class="card settings" role="dialog" aria-label="Settings">
+        <h2>Settings</h2>
+        ${toggle('sound', 'Sound')}
+        ${toggle('haptics', 'Vibration')}
+        <div class="row">
+          <span>Starting speed</span>
+          <div class="segmented">
+            ${([1, 2, 4] as const)
+              .map((v) => `<button data-speed="${v}" class="${s.speed === v ? 'on' : ''}">${v}×</button>`)
+              .join('')}
+          </div>
+        </div>
+        <div class="actions"><button class="primary" data-act="close">Done</button></div>
+      </div>`;
+  };
+  render(settings.get());
+  sheet.addEventListener('change', (e) => {
+    if (!(e.target instanceof HTMLInputElement)) return;
+    const key = e.target.dataset['key'];
+    if (key !== 'sound' && key !== 'haptics') return;
+    const updated = settings.update({ [key]: e.target.checked });
+    sfx.enabled = updated.sound;
+    if (key === 'sound' && updated.sound) {
+      sfx.unlock();
+      sfx.play('deploy');
+    }
+  });
+  sheet.addEventListener('click', (e) => {
+    if (!(e.target instanceof Element)) return;
+    const speed = e.target.closest<HTMLElement>('[data-speed]')?.dataset['speed'];
+    const chosen = speed === '1' ? 1 : speed === '2' ? 2 : speed === '4' ? 4 : undefined;
+    if (chosen) render(settings.update({ speed: chosen }));
+    if (e.target === sheet || e.target.closest('[data-act="close"]')) sheet.remove();
+  });
+  app.append(sheet);
 }
 
 /** Level art at one pixel per cell; locked levels show only a silhouette. */

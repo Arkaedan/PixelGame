@@ -11,9 +11,16 @@ pnpm install
 pnpm dev        # dev server, also reachable from your phone on the same Wi-Fi
 pnpm check      # typecheck, lint, format check, tests
 pnpm levels     # regenerate levels/*.json (or `pnpm levels 007` for one level)
+pnpm build      # production build in dist/ (served from /PixelGame/)
+pnpm exec vite preview   # serve the production build at http://localhost:4173/PixelGame/
+pnpm icons      # redraw the app icons in public/icons
 ```
 
-To play on your phone, run `pnpm dev`, then open the **Network** URL it prints (e.g. `http://192.168.1.20:5173`) in Chrome on the phone. Windows may ask to allow Node through the firewall the first time.
+To play on your phone while developing, run `pnpm dev`, then open the **Network** URL it prints (e.g. `http://192.168.1.20:5173`) in Chrome on the phone. Windows may ask to allow Node through the firewall the first time.
+
+## Installing on a phone
+
+Every push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml), which runs `pnpm check`, builds, and publishes to GitHub Pages at `https://arkaedan.github.io/PixelGame/`. Open that in Chrome on Android and choose **Add to Home screen** / **Install app**. It then opens full-screen and works offline; new versions are picked up the next time it's opened online.
 
 ## Adding a level
 
