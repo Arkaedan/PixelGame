@@ -1,17 +1,21 @@
 import {
   applyAction,
   createGame,
+  POWER_UPS,
   step,
   type Action,
   type GameEvent,
   type GameState,
   type Level,
+  type PowerUpKind,
 } from '../core/index.ts';
-import { cellCentre, computeLayout, contains, type Layout } from './layout.ts';
+import { totalPowerUps, type ClearRecord, type ProgressStore } from '../storage/progress.ts';
+import { cellCentre, computeLayout, contains, queueTiles, type Layout } from './layout.ts';
 import { draw, EFFECT_MS, type Effects } from './render.ts';
+import { describePowerUps, escapeHtml, formatDuration, plural, POWER_UP_NAMES } from './text.ts';
 
 /** Simulation step length at 1× speed. A 24×24 lap (100 positions) takes about 8 s. */
-const TICK_MS = 80;
+export const TICK_MS = 80;
 const SPEEDS = [1, 2, 4];
 /** Pause between the last move and the result card, so the final pop is visible. */
 const RESULT_DELAY_MS = 700;
@@ -19,11 +23,12 @@ const RESULT_DELAY_MS = 700;
 export interface GameScreenOptions {
   levelNumber: number;
   hasNext: boolean;
+  progress: ProgressStore;
   onExit: () => void;
   onNext: () => void;
 }
 
-/** One level being played: owns the DOM for the HUD, canvas and result card. */
+/** One level being played: owns the DOM for the HUD, canvas, power-up bar and result card. */
 export class GameScreen {
   private readonly level: Level;
   private readonly options: GameScreenOptions;
@@ -33,6 +38,7 @@ export class GameScreen {
   private readonly resultEl: HTMLElement;
   private readonly speedBtn: HTMLButtonElement;
   private readonly pauseBtn: HTMLButtonElement;
+  private readonly powerUpBar: HTMLElement;
   private readonly resizeObserver: ResizeObserver;
 
   private state!: GameState;
@@ -40,6 +46,8 @@ export class GameScreen {
   private effects: Effects = { pops: [], tracers: [], fades: [] };
   private speed = 0;
   private paused = false;
+  /** Pick Any is armed: the next queue tap may take any visible shooter. */
+  private picking = false;
   private flashUntil = 0;
   private acc = 0;
   private last = 0;
@@ -60,6 +68,16 @@ export class GameScreen {
         <button class="icon" data-act="restart" aria-label="Restart">↻</button>
       </header>
       <canvas></canvas>
+      <footer class="powerups">
+        ${POWER_UPS.map(
+          (kind) => `
+          <button data-act="${kind}">
+            <span class="pu-icon">${POWER_UP_ICONS[kind]}</span>
+            <span class="pu-name">${POWER_UP_NAMES[kind]}</span>
+            <span class="pu-count" hidden></span>
+          </button>`,
+        ).join('')}
+      </footer>
       <div class="result" hidden></div>`;
     container.append(this.root);
 
@@ -68,6 +86,7 @@ export class GameScreen {
     this.resultEl = this.root.querySelector('.result')!;
     this.speedBtn = this.root.querySelector('[data-act="speed"]')!;
     this.pauseBtn = this.root.querySelector('[data-act="pause"]')!;
+    this.powerUpBar = this.root.querySelector('.powerups')!;
 
     this.root.querySelector('.hud')!.addEventListener('click', (e) => {
       const act = actionOf(e);
@@ -76,6 +95,7 @@ export class GameScreen {
       else if (act === 'pause') this.setPaused(!this.paused);
       else if (act === 'restart') this.restart();
     });
+    this.powerUpBar.addEventListener('click', (e) => this.usePowerUp(actionOf(e)));
     this.resultEl.addEventListener('click', (e) => {
       const act = actionOf(e);
       if (act === 'retry') this.restart();
@@ -88,6 +108,13 @@ export class GameScreen {
     this.resizeObserver.observe(this.canvas);
     this.restart();
     this.frame = requestAnimationFrame(this.tick);
+
+    if (import.meta.env.DEV) {
+      // Dev-only console hook for play-testing, e.g. stepping through a level's stored solution.
+      Object.assign(window, {
+        __pixelgame: { state: () => this.state, apply: (a: Action) => applyAction(this.state, a) },
+      });
+    }
   }
 
   destroy(): void {
@@ -102,8 +129,10 @@ export class GameScreen {
     this.state = createGame(this.level);
     this.effects = { pops: [], tracers: [], fades: [] };
     this.acc = 0;
+    this.picking = false;
     this.resultEl.hidden = true;
     this.setPaused(false);
+    this.updatePowerUpBar();
     this.resize();
   }
 
@@ -128,6 +157,29 @@ export class GameScreen {
     this.pauseBtn.textContent = paused ? '▶' : '❚❚';
   }
 
+  private usePowerUp(act: string | undefined): void {
+    if (this.paused || this.state.status !== 'playing') return;
+    if (act === 'pickAny') {
+      this.picking = !this.picking;
+    } else if (act === 'extraSlot' || act === 'reveal') {
+      if (applyAction(this.state, { type: 'powerUp', kind: act }).ok) vibrate(8);
+    }
+    this.updatePowerUpBar();
+  }
+
+  /** Show how often each power-up was used this attempt, and Pick Any's armed state. */
+  private updatePowerUpBar(): void {
+    for (const kind of POWER_UPS) {
+      const btn = this.powerUpBar.querySelector<HTMLButtonElement>(`[data-act="${kind}"]`)!;
+      const count = btn.querySelector<HTMLElement>('.pu-count')!;
+      const used = this.state.powerUps[kind];
+      count.hidden = used === 0;
+      count.textContent = `×${used}`;
+      btn.classList.toggle('armed', kind === 'pickAny' && this.picking);
+      btn.disabled = kind === 'reveal' && this.state.revealAll;
+    }
+  }
+
   private onTap(x: number, y: number): void {
     if (this.paused || this.state.status !== 'playing' || !this.layout) return;
     const p = { x, y };
@@ -135,12 +187,19 @@ export class GameScreen {
     const slot = this.layout.buffer.findIndex((r) => contains(r, p));
     if (slot !== -1) action = { type: 'deployBuffer', slot };
     const column = this.layout.columns.findIndex((r) => contains(r, p));
-    if (column !== -1) action = { type: 'deployQueue', column };
+    if (column !== -1) {
+      const tile = this.picking
+        ? queueTiles(this.layout, this.state).tiles.find((t) => contains(t.rect, p))
+        : undefined;
+      action = tile ? { type: 'deployQueue', column: tile.column, index: tile.index } : { type: 'deployQueue', column };
+    }
     if (!action) return;
 
     const result = applyAction(this.state, action);
     if (result.ok) {
       vibrate(8);
+      if (action.type === 'deployQueue') this.picking = false;
+      this.updatePowerUpBar();
     } else if (result.error === 'track-full') {
       this.flashUntil = performance.now() + 600;
       vibrate([20, 40, 20]);
@@ -163,6 +222,7 @@ export class GameScreen {
       draw(this.ctx, this.state, this.layout, this.acc / TICK_MS, now, this.effects, {
         paused: this.paused,
         flashUntil: this.flashUntil,
+        pickAny: this.picking,
       });
     }
     this.frame = requestAnimationFrame(this.tick);
@@ -190,16 +250,17 @@ export class GameScreen {
         }
         case 'won':
           vibrate([30, 60, 30]);
-          this.showResult('Cleared!', 'Every pixel is gone.', true);
+          this.picking = false;
+          this.showWin();
           break;
         case 'lost':
           vibrate(120);
-          this.showResult(
+          this.picking = false;
+          this.showLoss(
             e.reason === 'overflow' ? 'Buffer overflow' : 'Out of moves',
             e.reason === 'overflow'
               ? 'A shooter finished its lap with the buffer full.'
               : 'Nothing left can hit the remaining pixels.',
-            false,
           );
           break;
         default:
@@ -215,22 +276,65 @@ export class GameScreen {
     if (fx.fades.length) fx.fades = fx.fades.filter((f) => now - f.t < EFFECT_MS.fade);
   }
 
-  private showResult(title: string, detail: string, won: boolean): void {
+  private showWin(): void {
+    const record: ClearRecord = {
+      powerUps: { ...this.state.powerUps },
+      ticks: this.state.tick,
+      at: new Date().toISOString(),
+    };
+    const { isNewBest, previous } = this.options.progress.recordClear(this.level.id, record);
+    const perfect = totalPowerUps(record) === 0;
+    let bestLine: string;
+    if (!previous) bestLine = 'First clear!';
+    else if (isNewBest) bestLine = `New best! Previous: ${summarise(previous)}`;
+    else bestLine = `Best: ${summarise(previous)}`;
+
+    this.showCard(
+      'won',
+      perfect ? '⭐ Perfect!' : 'Cleared!',
+      `<p class="used">${describePowerUps(record.powerUps)}</p>
+       <p class="time">Time ${formatDuration(record.ticks * TICK_MS)}</p>
+       <p class="best ${isNewBest ? 'new' : ''}">${bestLine}</p>`,
+      `${this.options.hasNext ? '<button class="primary" data-act="next">Next level</button>' : ''}
+       <button data-act="retry">${perfect ? 'Play again' : 'Retry for fewer power-ups'}</button>
+       <button data-act="levels">Levels</button>`,
+    );
+  }
+
+  private showLoss(title: string, detail: string): void {
+    const best = this.options.progress.get(this.level.id)?.best;
+    this.showCard(
+      'lost',
+      title,
+      `<p>${detail}</p>${best ? `<p class="best">Best: ${summarise(best)}</p>` : ''}`,
+      `<button class="primary" data-act="retry">Retry</button>
+       <button data-act="levels">Levels</button>`,
+    );
+  }
+
+  private showCard(kind: 'won' | 'lost', title: string, body: string, actions: string): void {
     this.resultTimer = window.setTimeout(() => {
-      const next = won && this.options.hasNext ? `<button class="primary" data-act="next">Next level</button>` : '';
       this.resultEl.innerHTML = `
-        <div class="card ${won ? 'won' : 'lost'}">
+        <div class="card ${kind}">
           <h2>${title}</h2>
-          <p>${detail}</p>
-          <div class="actions">
-            ${next}
-            <button class="${won ? '' : 'primary'}" data-act="retry">Retry</button>
-            <button data-act="levels">Levels</button>
-          </div>
+          ${body}
+          <div class="actions">${actions}</div>
         </div>`;
       this.resultEl.hidden = false;
     }, RESULT_DELAY_MS);
   }
+}
+
+const POWER_UP_ICONS: Record<PowerUpKind, string> = {
+  extraSlot: '+1',
+  pickAny: '☝',
+  reveal: '👁',
+};
+
+/** "Perfect in 1:05" or "2 power-ups in 1:05" */
+function summarise(record: ClearRecord): string {
+  const total = totalPowerUps(record);
+  return `${total ? plural(total, 'power-up') : 'Perfect'} in ${formatDuration(record.ticks * TICK_MS)}`;
 }
 
 function vibrate(pattern: number | number[]): void {
@@ -239,10 +343,6 @@ function vibrate(pattern: number | number[]): void {
   } catch {
     // Not supported (e.g. desktop or iOS); haptics are optional.
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
 /** The `data-act` value of the button (or its child) that was clicked. */

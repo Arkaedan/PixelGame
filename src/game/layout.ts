@@ -1,4 +1,4 @@
-import { RULES, type Level } from '../core/index.ts';
+import { RULES, type GameState, type Level } from '../core/index.ts';
 
 export interface Point {
   x: number;
@@ -106,4 +106,52 @@ export function cellCentre(layout: Layout, level: Level, cell: number): Point {
   const x = cell % level.width;
   const y = Math.floor(cell / level.width);
   return { x: layout.board.x + (x + 0.5) * layout.cell, y: layout.board.y + (y + 0.5) * layout.cell };
+}
+
+export interface QueueTile {
+  column: number;
+  index: number;
+  rect: Rect;
+  /** A slim tile for a row past the normally visible ones, shown after Reveal. */
+  compact: boolean;
+}
+
+export interface QueueView {
+  tiles: QueueTile[];
+  /** "+N" labels for shooters that don't fit or aren't visible. */
+  more: { column: number; count: number; at: Point }[];
+}
+
+const COMPACT_H = 22;
+const COMPACT_GAP = 4;
+const MORE_H = 18;
+/** Tiles behind the front are inset rather than dimmed, so colours stay true for matching. */
+const INSET = 4;
+
+/** Where each visible queue shooter is drawn; shared by rendering and tap handling. */
+export function queueTiles(layout: Layout, state: GameState): QueueView {
+  const { tile } = layout;
+  const view: QueueView = { tiles: [], more: [] };
+  const bottom = layout.height - MORE_H;
+  layout.columns.forEach((col, column) => {
+    const items = state.queue[column]!;
+    let y = col.y;
+    let index = 0;
+    for (; index < items.length; index++) {
+      const compact = index >= state.level.visibleRows;
+      if (compact && !state.revealAll) break;
+      const h = compact ? COMPACT_H : tile.h;
+      if (index > 0 && y + h > bottom) break;
+      const inset = index === 0 ? 0 : INSET;
+      const rect = compact
+        ? { x: col.x + inset, y, w: col.w - 2 * inset, h }
+        : { x: col.x + inset, y: y + inset, w: col.w - 2 * inset, h: h - 2 * inset };
+      view.tiles.push({ column, index, rect, compact });
+      y += h + (compact ? COMPACT_GAP : tile.gap);
+    }
+    if (index < items.length) {
+      view.more.push({ column, count: items.length - index, at: { x: col.x + col.w / 2, y: y + 6 } });
+    }
+  });
+  return view;
 }

@@ -18,6 +18,7 @@ export const EMPTY = -1;
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export type PowerUpKind = 'extraSlot' | 'pickAny' | 'reveal';
+export const POWER_UPS: readonly PowerUpKind[] = ['extraSlot', 'pickAny', 'reveal'];
 
 /** A shooter as written in a level file. */
 export interface ShooterSpec {

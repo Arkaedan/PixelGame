@@ -225,3 +225,100 @@ button {
 .level .size .hard {
   color: var(--danger);
 }
+
+/* Level list: records and locks */
+
+.level .badge {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge.perfect {
+  color: #ffd54f;
+}
+
+.badge.cleared {
+  color: var(--good);
+}
+
+.badge.locked {
+  color: var(--muted);
+}
+
+.level.is-locked {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Power-up bar */
+
+.powerups {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 10px;
+  flex: none;
+}
+
+.powerups button {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--panel);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.powerups button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.powerups button.armed {
+  background: var(--accent);
+  color: #0c0e13;
+}
+
+.pu-icon {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.pu-count {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #ffb74d;
+  color: #0c0e13;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.pu-count[hidden] {
+  display: none;
+}
+
+/* Result card details */
+
+.card .used {
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.card .time {
+  margin-bottom: 4px;
+}
+
+.card .best.new {
+  color: #ffd54f;
+  font-weight: 700;
+}

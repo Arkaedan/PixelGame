@@ -1,5 +1,5 @@
 import { isQueueRevealed, onTrackCount, type GameState } from '../core/index.ts';
-import { cellCentre, type Layout, type Point } from './layout.ts';
+import { cellCentre, queueTiles, type Layout, type Point } from './layout.ts';
 
 export const THEME = {
   bg: '#14161c',
@@ -10,6 +10,7 @@ export const THEME = {
   muted: '#8a90a0',
   danger: '#ff5c6c',
   hidden: '#1b1f29',
+  accent: '#7c9cff',
 };
 
 export const EFFECT_MS = { pop: 220, tracer: 140, fade: 260 };
@@ -43,6 +44,8 @@ export interface Overlay {
   paused: boolean;
   /** Highlight the track counter in red until this time (a rejected deploy). */
   flashUntil: number;
+  /** Pick Any is armed: highlight shooters that can be picked from behind the front. */
+  pickAny: boolean;
 }
 
 export function draw(
@@ -137,15 +140,20 @@ export function draw(
   ctx.font = `600 13px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = now < overlay.flashUntil ? THEME.danger : THEME.muted;
   const used = state.buffer.filter((s) => s !== null).length;
-  ctx.fillText(
-    `On track ${onTrackCount(state)}/${state.capacity}   ·   Buffer ${used}/${state.buffer.length}`,
-    layout.status.x,
-    layout.status.y,
-  );
+  if (overlay.pickAny) {
+    ctx.fillStyle = THEME.accent;
+    ctx.fillText('Pick Any: tap any shooter in the queue', layout.status.x, layout.status.y);
+  } else {
+    ctx.fillStyle = now < overlay.flashUntil ? THEME.danger : THEME.muted;
+    ctx.fillText(
+      `On track ${onTrackCount(state)}/${state.capacity}   ·   Buffer ${used}/${state.buffer.length}`,
+      layout.status.x,
+      layout.status.y,
+    );
+  }
 
-  drawQueue(ctx, state, layout);
+  drawQueue(ctx, state, layout, overlay.pickAny);
 
   if (overlay.paused) {
     ctx.fillStyle = 'rgba(10,12,16,0.6)';
@@ -178,47 +186,39 @@ function drawBoard(ctx: CanvasRenderingContext2D, state: GameState, layout: Layo
   }
 }
 
-function drawQueue(ctx: CanvasRenderingContext2D, state: GameState, layout: Layout): void {
-  const { tile } = layout;
+function drawQueue(ctx: CanvasRenderingContext2D, state: GameState, layout: Layout, pickAny: boolean): void {
   const palette = state.level.palette;
-  layout.columns.forEach((col, ci) => {
-    const items = state.queue[ci]!;
-    const fit = Math.max(1, Math.floor((col.h - 18) / (tile.h + tile.gap)));
-    const shown = Math.min(items.length, state.revealAll ? fit : Math.min(fit, state.level.visibleRows));
-    for (let i = 0; i < shown; i++) {
-      const s = items[i]!;
-      // Tiles behind the front are inset rather than dimmed, so colours stay true for matching.
-      const inset = i === 0 ? 0 : 4;
-      const x = col.x + inset;
-      const y = col.y + i * (tile.h + tile.gap) + inset;
-      const revealed = isQueueRevealed(state, ci, i);
-      ctx.fillStyle = revealed ? palette[s.color]! : THEME.hidden;
-      ctx.beginPath();
-      ctx.roundRect(x, y, tile.w - 2 * inset, tile.h - 2 * inset, 8);
-      ctx.fill();
-      if (!revealed) {
-        // Mystery tiles are dark with a dashed edge, so they can't be mistaken for a grey shooter.
-        ctx.save();
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.restore();
-      } else if (i === 0) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-      const size = Math.min(20, tile.h * 0.46) * (i === 0 ? 1 : 0.85);
-      label(ctx, revealed ? String(s.ammo) : '?', col.x + tile.w / 2, y - inset + tile.h / 2, size);
+  const view = queueTiles(layout, state);
+  for (const { column, index, rect, compact } of view.tiles) {
+    const s = state.queue[column]![index]!;
+    const revealed = isQueueRevealed(state, column, index);
+    ctx.fillStyle = revealed ? palette[s.color]! : THEME.hidden;
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.w, rect.h, compact ? 5 : 8);
+    ctx.fill();
+    if (pickAny && index > 0) {
+      ctx.strokeStyle = THEME.accent;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (!revealed) {
+      // Mystery tiles are dark with a dashed edge, so they can't be mistaken for a grey shooter.
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    } else if (index === 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
-    const more = items.length - shown;
-    if (more > 0) {
-      ctx.fillStyle = THEME.muted;
-      ctx.font = `600 12px system-ui, sans-serif`;
-      ctx.fillText(`+${more}`, col.x + tile.w / 2, col.y + shown * (tile.h + tile.gap) + 6);
-    }
-  });
+    const size = compact ? 12 : Math.min(20, layout.tile.h * 0.46) * (index === 0 ? 1 : 0.85);
+    label(ctx, revealed ? String(s.ammo) : '?', rect.x + rect.w / 2, rect.y + rect.h / 2, size);
+  }
+  ctx.fillStyle = THEME.muted;
+  ctx.font = `600 12px system-ui, sans-serif`;
+  for (const m of view.more) ctx.fillText(`+${m.count}`, m.at.x, m.at.y);
 }
 
 function drawToken(ctx: CanvasRenderingContext2D, at: Point, size: number, colour: string, text: string): void {

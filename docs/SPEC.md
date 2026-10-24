@@ -72,13 +72,18 @@ A phone-first puzzle game: clear a pixel-art grid by sending coloured shooters a
 
 Free and unlimited, but **every use is recorded** for the attempt. Restarting resets the count.
 
-| Power-up       | Effect                                                                                                      |
-| -------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Extra Slot** | +1 track capacity for the rest of the attempt. Stackable (5 → 6 → 7 …). Each use counts 1.                  |
-| **Pick Any**   | Your next deploy can be **any visible shooter** in the queue, not just a column's front. Each use counts 1. |
-| **Reveal**     | Shows the whole queue (every depth, including mystery shooters) for the rest of the attempt. Counts 1.      |
+| Power-up       | Effect                                                                                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Extra Slot** | +1 track capacity for the rest of the attempt. Stackable (5 → 6 → 7 …). Each use counts 1.                                                                |
+| **Pick Any**   | Your next deploy can be **any visible shooter** in the queue, not just a column's front. Counts 1 when you actually take a shooter from behind the front. |
+| **Reveal**     | Shows the whole queue (every depth, including mystery shooters) for the rest of the attempt. Counts 1.                                                    |
 
 Pick Any together with Reveal lets you take any shooter in the queue.
+
+**Controls (milestone 4):** a bar at the bottom of the game screen has the three buttons, each with a ×N badge for uses this attempt.
+
+- **Pick Any** arms a selection mode: the button lights up, pickable shooters get an outline, and the status line says what to do. Tap a shooter to send it out; tap the button again to cancel. Taking a column front while armed just deploys normally and is not counted.
+- **Reveal** greys out once used. Extra rows appear as compact tiles beneath the normal three, as many as fit on screen; any beyond that stay as a "+N" count.
 
 ---
 
@@ -86,9 +91,12 @@ Pick Any together with Reveal lets you take any shooter in the queue.
 
 - Each level keeps your **best clear**, ranked by **total power-ups used** (fewer is better). Ties go to the faster clear time. A worse result never overwrites a better one.
 - The breakdown is stored, e.g. `1× Extra Slot, 2× Pick Any`.
-- Badges on level select: **⭐ Perfect** (0 power-ups), **✓ Clear** (any clear).
+- Badges on level select: **⭐ Perfect** (0 power-ups), **✓ N power-ups** (any clear), **🔒 Locked** (art shown as a silhouette).
+- Clear time is measured in simulation steps (80 ms each at 1×), so pausing and fast-forward do not change it.
+- **Result card**: on a win it shows the power-ups used, the time, and either "First clear!", "New best!" (with the previous best) or your existing best. On a loss it shows the reason and your best, if any.
 - **Linear unlock**: clearing a level with any number of power-ups unlocks the next. Any unlocked level can be replayed.
-- Progress is saved locally on the device (`localStorage`). No accounts.
+- Progress is saved locally on the device (`localStorage`, key `pixelgame.progress.v1`). No accounts. If storage is unavailable, progress lasts for the session.
+- For testing, adding `?all` to the URL opens every level without changing saved progress.
 
 ---
 
