@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, isQueueRevealed, isStuck, step } from '../../src/core';
-import { BLUE, boardRows, game, RED, run } from './helpers';
+import { applyAction, isQueueRevealed, isStuck, step } from '../../src/core/index.ts';
+import { BLUE, boardRows, game, RED, run } from './helpers.ts';
 
 const deploy = (column: number, index?: number) => ({ type: 'deployQueue' as const, column, index });
 
@@ -14,7 +14,7 @@ describe('shooting', () => {
     expect(run(s, 2).map((e) => e.type)).toEqual(['shot', 'shot']);
     expect(step(s)).toEqual([
       { type: 'shot', shooterId: 0, cell: 2, color: RED, pos: 3 },
-      { type: 'exhausted', shooterId: 0, pos: 3 },
+      { type: 'exhausted', shooterId: 0, color: RED, pos: 3 },
       { type: 'won' },
     ]);
     expect(s.status).toBe('won');
@@ -129,6 +129,18 @@ describe('deploying', () => {
     expect(s.pending).toHaveLength(1);
     step(s);
     expect(s.track.map((t) => t.pos)).toEqual([1, 0]);
+  });
+
+  it('spaces shooters further apart on bigger boards', () => {
+    // longest side 33 -> entry gap of 3 positions
+    const s = game(['1'.repeat(33)], [[{ c: RED, a: 1 }], [{ c: RED, a: 1 }]]);
+    expect(s.level.entryGap).toBe(3);
+    applyAction(s, deploy(0));
+    applyAction(s, deploy(1));
+    run(s, 3);
+    expect(s.track.map((t) => t.pos)).toEqual([2]);
+    step(s);
+    expect(s.track.map((t) => t.pos)).toEqual([3, 0]);
   });
 
   it('enforces track capacity, which Extra Slot raises', () => {

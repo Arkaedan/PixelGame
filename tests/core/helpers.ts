@@ -6,7 +6,7 @@ import {
   type GameState,
   type LevelData,
   type ShooterSpec,
-} from '../../src/core';
+} from '../../src/core/index.ts';
 
 export const RED = 0;
 export const BLUE = 1;

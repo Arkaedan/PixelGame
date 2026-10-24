@@ -1,5 +1,5 @@
-import { applyAction, createGame, isIdle, step } from './game';
-import type { ActionError, GameState, Level, TimedAction } from './types';
+import { applyAction, createGame, isIdle, step } from './game.ts';
+import type { ActionError, GameState, Level, TimedAction } from './types.ts';
 
 export interface ReplayResult {
   state: GameState;

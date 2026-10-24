@@ -1,7 +1,6 @@
-import { firstPixel } from './track';
+import { firstPixel } from './track.ts';
 import {
   EMPTY,
-  RULES,
   type Action,
   type ActionError,
   type ActionResult,
@@ -10,7 +9,7 @@ import {
   type Level,
   type LossReason,
   type Shooter,
-} from './types';
+} from './types.ts';
 
 export function createGame(level: Level): GameState {
   let nextId = 0;
@@ -134,7 +133,7 @@ export function step(state: GameState): GameEvent[] {
     events.push({ type: 'buffered', shooterId: t.shooter.id, slot });
   }
 
-  if (state.pending.length && state.track.every((t) => t.pos >= RULES.entryGap)) {
+  if (state.pending.length && state.track.every((t) => t.pos >= level.entryGap)) {
     const shooter = state.pending.shift()!;
     state.track.push({ shooter, pos: 0 });
     events.push({ type: 'enter', shooterId: shooter.id });
@@ -147,7 +146,8 @@ export function step(state: GameState): GameEvent[] {
     state.remaining--;
     t.shooter.ammo--;
     events.push({ type: 'shot', shooterId: t.shooter.id, cell, color: t.shooter.color, pos: t.pos });
-    if (t.shooter.ammo === 0) events.push({ type: 'exhausted', shooterId: t.shooter.id, pos: t.pos });
+    if (t.shooter.ammo === 0)
+      events.push({ type: 'exhausted', shooterId: t.shooter.id, color: t.shooter.color, pos: t.pos });
   }
   state.track = state.track.filter((t) => t.shooter.ammo > 0);
 

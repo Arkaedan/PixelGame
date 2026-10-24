@@ -15,7 +15,13 @@
     "es2025": true
   },
   "rules": {
-    "typescript/consistent-return": "off"
+    "typescript/consistent-return": "off",
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": ["**/*.css"]
+      }
+    ]
   },
   "ignorePatterns": ["dist/**", "coverage/**"]
 }

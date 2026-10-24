@@ -4,8 +4,12 @@ export const RULES = {
   trackCapacity: 5,
   bufferSize: 5,
   visibleRows: 3,
-  /** A queued deploy enters only when no shooter is within this many positions of the entry. */
-  entryGap: 1,
+  /**
+   * A deployed shooter enters only when no shooter is within `entryGap` positions of the entry.
+   * By default the gap is one position per this many cells of the board's longest side, so shooters
+   * stay visually apart on big boards where cells are small.
+   */
+  cellsPerEntryGap: 16,
 } as const;
 
 /** Grid cell value for "no pixel". */
@@ -51,6 +55,7 @@ export interface LevelData {
   trackCapacity?: number;
   bufferSize?: number;
   visibleRows?: number;
+  entryGap?: number;
   /** A no-power-up playthrough that clears the level. */
   solution?: TimedAction[];
 }
@@ -73,6 +78,7 @@ export interface Level {
   trackCapacity: number;
   bufferSize: number;
   visibleRows: number;
+  entryGap: number;
   trackLength: number;
   slots: TrackSlot[];
   solution?: TimedAction[];
@@ -114,7 +120,7 @@ export interface GameState {
 export type GameEvent =
   | { type: 'enter'; shooterId: number }
   | { type: 'shot'; shooterId: number; cell: number; color: number; pos: number }
-  | { type: 'exhausted'; shooterId: number; pos: number }
+  | { type: 'exhausted'; shooterId: number; color: number; pos: number }
   | { type: 'buffered'; shooterId: number; slot: number }
   | { type: 'won' }
   | { type: 'lost'; reason: LossReason };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY, LevelError, parseLevel, type LevelData } from '../../src/core';
-import { BLUE, levelData, RED } from './helpers';
+import { EMPTY, LevelError, parseLevel, type LevelData } from '../../src/core/index.ts';
+import { BLUE, levelData, RED } from './helpers.ts';
 
 function problemsOf(data: LevelData): string {
   try {

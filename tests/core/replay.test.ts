@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cloneGame, parseLevel, replay, step, verifySolution, type TimedAction } from '../../src/core';
-import { BLUE, levelData, RED } from './helpers';
+import { cloneGame, parseLevel, replay, step, verifySolution, type TimedAction } from '../../src/core/index.ts';
+import { BLUE, levelData, RED } from './helpers.ts';
 
 // Red frame around a blue centre: blue can only be reached once red is cleared.
 const framed = parseLevel(

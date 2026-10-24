@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSlots, EMPTY, firstPixel, trackLength } from '../../src/core';
+import { buildSlots, EMPTY, firstPixel, trackLength } from '../../src/core/index.ts';
 
 describe('track layout', () => {
   it('has 2W+2H+4 positions with corners at the expected places', () => {

@@ -1,13 +1,15 @@
-import { buildSlots, trackLength } from './track';
-import { EMPTY, RULES, type Level, type LevelData } from './types';
+import { buildSlots, trackLength } from './track.ts';
+import { EMPTY, RULES, type Level, type LevelData } from './types.ts';
 
 export class LevelError extends Error {
-  constructor(
-    readonly levelId: string,
-    readonly problems: string[],
-  ) {
+  readonly levelId: string;
+  readonly problems: string[];
+
+  constructor(levelId: string, problems: string[]) {
     super(`Invalid level "${levelId}":\n  - ${problems.join('\n  - ')}`);
     this.name = 'LevelError';
+    this.levelId = levelId;
+    this.problems = problems;
   }
 }
 
@@ -75,7 +77,9 @@ export function parseLevel(data: LevelData, options: ParseOptions = {}): Level {
   const trackCapacity = data.trackCapacity ?? RULES.trackCapacity;
   const bufferSize = data.bufferSize ?? RULES.bufferSize;
   const visibleRows = data.visibleRows ?? RULES.visibleRows;
+  const entryGap = data.entryGap ?? Math.max(1, Math.ceil(Math.max(width, height) / RULES.cellsPerEntryGap));
   if (trackCapacity < 1) problems.push('trackCapacity must be at least 1');
+  if (!Number.isInteger(entryGap) || entryGap < 1) problems.push('entryGap must be a positive integer');
   if (bufferSize < 0) problems.push('bufferSize must not be negative');
   if (visibleRows < 1) problems.push('visibleRows must be at least 1');
 
@@ -92,6 +96,7 @@ export function parseLevel(data: LevelData, options: ParseOptions = {}): Level {
     trackCapacity,
     bufferSize,
     visibleRows,
+    entryGap,
     trackLength: trackLength(width, height),
     slots: buildSlots(width, height),
     solution: data.solution,

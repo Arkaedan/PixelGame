@@ -24,7 +24,7 @@ A phone-first puzzle game: clear a pixel-art grid by sending coloured shooters a
 
 - The track has one position for each board column along the top and bottom sides, one for each board row along the left and right sides, plus 4 corners. Lap length = `2W + 2H + 4`.
 - Shooters **enter at the bottom-left corner**, travel **clockwise** (right along the bottom, up the right side, left along the top, down the left side), and leave at the same corner.
-- Shooters move at the same constant speed. A shooter can't be deployed while the entry position is occupied; the deploy waits until it's clear.
+- Shooters move at the same constant speed. A deployed shooter waits at the entry until the nearest shooter is at least the **entry gap** away: one position per 16 cells of the board's longest side (1 on boards up to 16, 2 on 24×24, 4 on 60×60), so tokens don't overlap on big boards. Waiting shooters still count towards track capacity.
 - Movement and shooting run on a **fixed-timestep, deterministic simulation** (integer ticks), and rendering interpolates between ticks for smooth motion. The same deploy timings always give the same result, which makes the solver, replays and tests possible.
 
 ### 2.2 Shooting (line of sight, one shot per line)
@@ -131,6 +131,7 @@ Pick Any together with Reveal lets you take any shooter in the queue.
 - **Verification**: replay the stored solution in the shared simulation. It must clear the board with no power-ups and no overflow. CI or the tests run this on every level file.
 - **Difficulty settings**: how far the column layout strays from the obvious order, buffer pressure, number of mystery shooters, and shooter count and size.
 - Claude can generate levels directly with the CLI, using original pixel art (shapes, fruit, animals, flags and so on), so you can play-test quickly.
+- **Current state (milestone 2):** `pnpm levels` builds `levels/*.json` from the art in `tools/generate/art.ts` with a simple greedy builder. It sends one shooter at a time, choosing the colour that hits the most pixels in a lap, and deals shooters round-robin into the columns. Those levels are easy; milestone 3 adds difficulty settings and PNG import.
 
 ### 6.4 Editor (PC dev tool, later milestone)
 
@@ -207,6 +208,6 @@ Later ideas: in-game editor, level share codes, more power-ups or mechanics, Cap
 - Lap of about 8 s at 1× on 24×24; speed per cell is fixed, so bigger boards have longer laps.
 - Pick Any covers **visible** shooters only (combine with Reveal for deeper ones).
 - Mystery shooters reveal on reaching the front row.
-- A blocked deploy (entry occupied) waits rather than being refused.
+- A blocked deploy (entry too close) waits rather than being refused; the entry gap scales with board size.
 - Ammo uses round numbers, with one remainder shooter per colour when needed.
 - Ties on best record go to the faster time.

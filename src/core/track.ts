@@ -1,4 +1,4 @@
-import { EMPTY, type TrackSlot } from './types';
+import { EMPTY, type TrackSlot } from './types.ts';
 
 /**
  * Track layout, clockwise from the entry at the bottom-left corner:
