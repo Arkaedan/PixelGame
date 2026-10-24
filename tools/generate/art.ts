@@ -1,103 +1,324 @@
-/** Source pixel art for levels. Each grid cell is a palette index, or -1 for empty. */
-export interface Art {
-  id: string;
-  name: string;
-  palette: string[];
-  grid: string[];
-}
+// Original pixel art for the starter levels, drawn with Painter. Palette index 0 is listed first.
+import type { Art } from './build.ts';
+import { Painter } from './paint.ts';
+import { createRng, randomInt } from './rng.ts';
 
-function paint(width: number, height: number, colourAt: (x: number, y: number) => number): string[] {
-  const rows: string[] = [];
-  for (let y = 0; y < height; y++) {
-    let row = '';
-    for (let x = 0; x < width; x++) {
-      const c = colourAt(x, y);
-      row += c < 0 ? '.' : c.toString(36);
-    }
-    rows.push(row);
-  }
-  return rows;
-}
+const C = {
+  red: '#e53935',
+  darkRed: '#8e1b1b',
+  pink: '#ff8a80',
+  orange: '#fb8c00',
+  yellow: '#fdd835',
+  cream: '#fff3c4',
+  green: '#43a047',
+  darkGreen: '#1b5e20',
+  lime: '#9ccc65',
+  blue: '#1e88e5',
+  navy: '#283593',
+  sky: '#81d4fa',
+  purple: '#8e24aa',
+  brown: '#6d4c41',
+  darkBrown: '#3e2723',
+  white: '#f5f5f5',
+  grey: '#90a4ae',
+  black: '#455a64',
+  teal: '#00897b',
+  magenta: '#d81b60',
+};
 
-/** Cells inside `inside` that touch an outside cell (4-neighbourhood) form its outline. */
-function onEdge(inside: (x: number, y: number) => boolean, x: number, y: number): boolean {
-  return !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
-}
-
-function heart(): Art {
+export function heart(): Art {
   const size = 24;
-  const inside = (x: number, y: number): boolean => {
-    // classic heart curve (x²+y²-1)³ - x²y³ <= 0, sampled at cell centres
-    const u = ((x + 0.5) / size) * 2.6 - 1.3;
-    const v = 1.25 - ((y + 0.5) / size) * 2.5;
-    return (u * u + v * v - 1) ** 3 - u * u * v ** 3 <= 0;
-  };
-  return {
-    id: '001',
-    name: 'Heart',
-    palette: ['#e53935', '#ff8a80', '#8e1b1b'],
-    grid: paint(size, size, (x, y) => {
-      if (!inside(x, y)) return -1;
-      if (onEdge(inside, x, y)) return 2;
-      return Math.hypot(x - 7, y - 7) < 2.6 ? 1 : 0;
-    }),
-  };
+  return new Painter(size)
+    .fill(0, (px, py) => {
+      const u = (px / size) * 2.5 - 1.25;
+      const v = 1.2 - (py / size) * 2.45;
+      return (u * u + v * v - 1) ** 3 - u * u * v ** 3 <= 0;
+    })
+    .outline(2)
+    .circle(7.5, 7.5, 2.6, 1)
+    .toArt([C.red, C.pink, C.darkRed]);
 }
 
-function smiley(): Art {
-  const size = 28;
-  const c = (size - 1) / 2;
-  const inside = (x: number, y: number): boolean => Math.hypot(x - c, y - c) <= 13.2;
-  return {
-    id: '002',
-    name: 'Smiley',
-    palette: ['#fdd835', '#3e2723', '#fb8c00'],
-    grid: paint(size, size, (x, y) => {
-      if (!inside(x, y)) return -1;
-      if (Math.hypot(x - c, y - c) > 11.8) return 2;
-      const eye = (ex: number): boolean => ((x - ex) / 1.6) ** 2 + ((y - 9.5) / 2.6) ** 2 <= 1;
-      if (eye(c - 4.5) || eye(c + 4.5)) return 1;
-      const d = Math.hypot(x - c, y - (c - 1));
-      if (d >= 6.6 && d <= 8.2 && y > c + 2) return 1;
-      return 0;
-    }),
-  };
+export function smiley(): Art {
+  const c = 14;
+  return new Painter(28)
+    .circle(c, c, 13.6, 2)
+    .circle(c, c, 12.2, 0)
+    .ellipse(c - 4.5, 10, 1.6, 2.6, 1)
+    .ellipse(c + 4.5, 10, 1.6, 2.6, 1)
+    .fill(1, (px, py) => {
+      const d = Math.hypot(px - c, py - (c - 1));
+      return d >= 6.6 && d <= 8.2 && py > c + 2;
+    })
+    .toArt([C.yellow, C.darkBrown, C.orange]);
 }
 
-function sunset(): Art {
-  const size = 32;
+export function quilt(): Art {
+  const tile = 6;
+  return new Painter(24)
+    .fill((x, y) => (Math.floor(x / tile) * 3 + Math.floor(y / tile)) % 4)
+    .toArt([C.blue, C.yellow, C.red, C.green]);
+}
+
+export function sunset(): Art {
   const horizon = 20;
   const sky = [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6];
-  return {
-    id: '003',
-    name: 'Sunset',
-    palette: ['#1565c0', '#1e88e5', '#fff176', '#4527a0', '#c2185b', '#ff7043', '#ffb74d'],
-    grid: paint(size, size, (x, y) => {
-      if (y < horizon) {
-        if (Math.hypot(x - 15.5, y - horizon) <= 7.5) return 2;
-        return sky[y]!;
-      }
-      // shimmering reflection of the sun, narrowing with depth
-      const half = 7 - (y - horizon) / 2;
-      if ((y - horizon) % 2 === 0 && Math.abs(x - 15.5) <= half) return 2;
+  return new Painter(32)
+    .fill((_, y) => {
+      if (y < horizon) return sky[y]!;
       return (y - horizon) % 4 < 2 ? 1 : 0;
-    }),
-  };
+    })
+    .fill(2, (px, py) => py < horizon && Math.hypot(px - 16, py - horizon) <= 7.5)
+    .fill(2, (px, py) => {
+      const depth = Math.floor(py) - horizon;
+      return depth >= 0 && depth % 2 === 0 && Math.abs(px - 16) <= 7 - depth / 2;
+    })
+    .toArt(['#1565c0', C.blue, '#fff176', '#4527a0', '#c2185b', '#ff7043', '#ffb74d']);
 }
 
-function checkers(): Art {
-  const size = 40;
-  const tile = 8;
-  return {
-    id: '004',
-    name: 'Checkers',
-    palette: ['#43a047', '#fdd835', '#1e88e5', '#e53935'],
-    grid: paint(size, size, (x, y) => {
-      const tx = Math.floor(x / tile);
-      const ty = Math.floor(y / tile);
-      return (tx + ty) % 2 === 0 ? ((tx + ty) % 4 === 0 ? 0 : 2) : tx % 2 === 0 ? 1 : 3;
-    }),
-  };
+export function mushroom(): Art {
+  return new Painter(32)
+    .rect(0, 29, 32, 3, 4)
+    .ellipse(16, 15, 14, 11.5, 0)
+    .fill(-1, (_, py) => py > 15 && py < 29)
+    .rect(11, 15, 10, 13, 2)
+    .ellipse(16, 27.5, 5, 1.5, 2)
+    .outline(3)
+    .rect(0, 29, 32, 3, 4)
+    .circle(10, 9, 2.6, 1)
+    .circle(19, 6, 2.2, 1)
+    .circle(23, 11.5, 2.4, 1)
+    .circle(14.5, 13, 1.6, 1)
+    .toArt([C.red, C.white, C.cream, C.darkBrown, C.green]);
 }
 
-export const ARTS: Art[] = [heart(), smiley(), sunset(), checkers()];
+export function rainbow(): Art {
+  const bands = [C.purple, C.blue, C.green, C.yellow, C.orange, C.red];
+  const p = new Painter(36);
+  // Outermost band first, so each smaller band paints over the inside of the previous one.
+  for (let i = bands.length - 1; i >= 0; i--) {
+    p.fill(i, (px, py) => py < 29 && Math.hypot(px - 18, py - 29) <= 6 + (i + 1) * 2);
+  }
+  p.fill(-1, (px, py) => py < 29 && Math.hypot(px - 18, py - 29) <= 6);
+  for (const [cx, cy, r] of [
+    [5, 28, 4],
+    [9.5, 29.5, 3.5],
+    [2, 31, 2.5],
+    [31, 28, 4],
+    [26.5, 29.5, 3.5],
+    [34, 31, 2.5],
+  ] as const) {
+    p.circle(cx, cy, r, 6);
+  }
+  return p.toArt([...bands, C.white]);
+}
+
+export function cat(): Art {
+  return new Painter(36)
+    .polygon(
+      [
+        [5, 17],
+        [8, 3],
+        [17, 11],
+      ],
+      0,
+    )
+    .polygon(
+      [
+        [31, 17],
+        [28, 3],
+        [19, 11],
+      ],
+      0,
+    )
+    .ellipse(18, 21, 13.5, 11.5, 0)
+    .outline(3)
+    .polygon(
+      [
+        [8, 12],
+        [9, 6],
+        [13.5, 10.5],
+      ],
+      1,
+    )
+    .polygon(
+      [
+        [28, 12],
+        [27, 6],
+        [22.5, 10.5],
+      ],
+      1,
+    )
+    .ellipse(18, 27, 5.5, 3.5, 4)
+    .ellipse(12.5, 19, 2.4, 3.2, 2)
+    .ellipse(23.5, 19, 2.4, 3.2, 2)
+    .ellipse(12.5, 19, 0.8, 2.6, 3)
+    .ellipse(23.5, 19, 0.8, 2.6, 3)
+    .polygon(
+      [
+        [16, 24],
+        [20, 24],
+        [18, 26.5],
+      ],
+      1,
+    )
+    .toArt([C.grey, C.pink, C.lime, C.black, C.white]);
+}
+
+export function tree(): Art {
+  const p = new Painter(40).rect(0, 36, 40, 4, 4).rect(17, 30, 6, 7, 2);
+  const layers: [number, number, number][] = [
+    [16, 33, 17],
+    [10, 26, 14],
+    [4, 18, 10],
+  ];
+  layers.forEach(([top, bottom, half], i) =>
+    p.polygon(
+      [
+        [20, top],
+        [20 - half, bottom],
+        [20 + half, bottom],
+      ],
+      i % 2,
+    ),
+  );
+  for (const [x, y] of [
+    [14, 29],
+    [25, 27],
+    [19, 22],
+    [13, 22],
+    [24, 17],
+    [17, 13],
+  ] as const) {
+    p.circle(x, y, 1.3, 5);
+  }
+  return p
+    .polygon(
+      [
+        [20, 0.5],
+        [22, 5],
+        [18, 5],
+      ],
+      3,
+    )
+    .toArt([C.green, C.darkGreen, C.brown, C.yellow, C.white, C.red]);
+}
+
+export function fish(): Art {
+  return new Painter(40)
+    .polygon(
+      [
+        [28, 20],
+        [38, 10],
+        [36, 20],
+        [38, 30],
+      ],
+      1,
+    )
+    .polygon(
+      [
+        [14, 12],
+        [22, 5],
+        [24, 13],
+      ],
+      1,
+    )
+    .ellipse(17, 20, 14, 9, 0)
+    .fill(2, (px, py) => ((px - 17) / 14) ** 2 + ((py - 20) / 9) ** 2 <= 1 && Math.abs(Math.abs(px - 18) - 4) < 1.4)
+    .circle(8.5, 18, 2.4, 2)
+    .circle(8.5, 18, 1.1, 3)
+    .circle(35, 5, 1.6, 4)
+    .circle(38, 1.5, 1.1, 4)
+    .toArt([C.orange, '#e65100', C.white, C.black, C.sky]);
+}
+
+export function target(): Art {
+  const size = 44;
+  const centre = size / 2;
+  return new Painter(size)
+    .fill((x, y) => Math.floor(Math.max(Math.abs(x + 0.5 - centre), Math.abs(y + 0.5 - centre)) / 4) % 5)
+    .toArt([C.red, C.white, C.blue, C.yellow, C.black]);
+}
+
+/** The planet's ring: between two flattened ellipses. */
+function planetRing(px: number, py: number): boolean {
+  const outer = ((px - 24) / 23) ** 2 + ((py - 25) / 6.5) ** 2 <= 1;
+  const inner = ((px - 24) / 17.5) ** 2 + ((py - 25) / 4) ** 2 <= 1;
+  return outer && !inner;
+}
+
+export function planet(): Art {
+  const rng = createRng(48);
+  const p = new Painter(48);
+  for (let i = 0; i < 40; i++) p.set(randomInt(rng, 0, 47), randomInt(rng, 0, 47), i % 3 === 0 ? 5 : 4);
+  p.fill(3, (px, py) => planetRing(px, py) && py < 25);
+  p.fill(
+    (_, y) => [0, 1, 2][Math.floor((y - 11) / 4) % 3]!,
+    (px, py) => Math.hypot(px - 24, py - 25) <= 13.5,
+  );
+  p.fill(3, (px, py) => planetRing(px, py) && py >= 25);
+  return p.toArt([C.orange, C.cream, C.brown, C.sky, C.white, C.yellow]);
+}
+
+export function argyle(): Art {
+  const d = 12;
+  return new Painter(48)
+    .fill((x, y) => {
+      const u = Math.floor((x + 0.5 + y + 0.5) / d);
+      const v = Math.floor((x + 0.5 - (y + 0.5) + 48) / d);
+      if ((x + y + d / 2) % d === 0 || (x - y + 48 + d / 2) % d === 0) return 2;
+      return (u + v) % 2;
+    })
+    .toArt([C.navy, C.teal, C.yellow]);
+}
+
+export function house(): Art {
+  return new Painter(52)
+    .circle(45, 7, 4.5, 6)
+    .rect(0, 44, 52, 8, 0)
+    .rect(34, 9, 5, 12, 4)
+    .polygon(
+      [
+        [5, 26],
+        [26, 8],
+        [47, 26],
+      ],
+      1,
+    )
+    .rect(10, 25, 32, 19, 2)
+    .rect(22, 31, 8, 13, 4)
+    .rect(13, 29, 7, 7, 3)
+    .rect(32, 29, 7, 7, 3)
+    .rect(16, 29, 1, 7, 2)
+    .rect(13, 32, 7, 1, 2)
+    .rect(35, 29, 1, 7, 2)
+    .rect(32, 32, 7, 1, 2)
+    .polygon(
+      [
+        [22, 44],
+        [30, 44],
+        [34, 52],
+        [18, 52],
+      ],
+      5,
+    )
+    .toArt([C.green, C.red, C.cream, C.sky, C.brown, C.grey, C.yellow]);
+}
+
+export function stainedGlass(): Art {
+  const size = 60;
+  const rng = createRng(60);
+  const seeds = Array.from({ length: 34 }, (_, i) => ({
+    x: rng() * size,
+    y: rng() * size,
+    c: i % 7,
+  }));
+  return new Painter(size)
+    .fill((x, y) => {
+      const ds = seeds
+        .map((s) => ({ c: s.c, d: Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y) }))
+        .toSorted((a, b) => a.d - b.d);
+      return ds[1]!.d - ds[0]!.d < 1.1 ? 7 : ds[0]!.c;
+    })
+    .toArt([C.red, C.blue, C.yellow, C.green, C.purple, C.orange, C.sky, C.black]);
+}

@@ -9,7 +9,7 @@ export const THEME = {
   text: '#e8eaf0',
   muted: '#8a90a0',
   danger: '#ff5c6c',
-  hidden: '#4a5060',
+  hidden: '#1b1f29',
 };
 
 export const EFFECT_MS = { pop: 220, tracer: 140, fade: 260 };
@@ -196,7 +196,15 @@ function drawQueue(ctx: CanvasRenderingContext2D, state: GameState, layout: Layo
       ctx.beginPath();
       ctx.roundRect(x, y, tile.w - 2 * inset, tile.h - 2 * inset, 8);
       ctx.fill();
-      if (i === 0) {
+      if (!revealed) {
+        // Mystery tiles are dark with a dashed edge, so they can't be mistaken for a grey shooter.
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+      } else if (i === 0) {
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 2;
         ctx.stroke();

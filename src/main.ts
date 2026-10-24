@@ -19,7 +19,7 @@ function showMenu(): void {
             <canvas width="${level.width}" height="${level.height}"></canvas>
             <span class="num">${i + 1}</span>
             <span class="name">${level.name}</span>
-            <span class="size">${level.width}×${level.height}</span>
+            <span class="size">${level.width}×${level.height}${level.difficulty ? ` · <b class="${level.difficulty}">${level.difficulty}</b>` : ''}</span>
           </button>`,
         ).join('')}
       </div>

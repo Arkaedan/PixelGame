@@ -126,12 +126,28 @@ Pick Any together with Reveal lets you take any shooter in the queue.
 
 ### 6.3 Generator and solver (dev tooling, not in the game)
 
-- **Input**: pixel art, either a PNG (colour-quantised, transparency = empty) or a JSON grid.
-- **Construction**: simulate a no-power-up playthrough with a heuristic player, record the order of deploys, then split that order across 5 columns in a way the front-of-column rule allows. Every generated level is **solvable by construction**, and the solution is stored in the file.
-- **Verification**: replay the stored solution in the shared simulation. It must clear the board with no power-ups and no overflow. CI or the tests run this on every level file.
-- **Difficulty settings**: how far the column layout strays from the obvious order, buffer pressure, number of mystery shooters, and shooter count and size.
-- Claude can generate levels directly with the CLI, using original pixel art (shapes, fruit, animals, flags and so on), so you can play-test quickly.
-- **Current state (milestone 2):** `pnpm levels` builds `levels/*.json` from the art in `tools/generate/art.ts` with a simple greedy builder. It sends one shooter at a time, choosing the colour that hits the most pixels in a lap, and deals shooters round-robin into the columns. Those levels are easy; milestone 3 adds difficulty settings and PNG import.
+The code is in `tools/generate/`. `pnpm levels` rebuilds `levels/*.json` from the list in `levels.ts`, and `pnpm levels 007 012` rebuilds only those levels.
+
+- **Input**: pixel art, either drawn in code (`Painter` in `paint.ts`, art in `art.ts`) or a PNG in `art/` via `importPng(path, { size, maxColours })`. PNG import:
+  - shrinks the image by averaging each cell's area, and cells less than 50% opaque become empty;
+  - reduces it to at most `maxColours` colours (seeded k-means);
+  - merges colours closer than a minimum distance, so players can tell them apart.
+- **Construction** (`build.ts`, one seeded attempt): from an idle board, the builder repeatedly does one of two things:
+  - **Redeploy** a buffered shooter that has targets.
+  - **Create a new shooter.** Its colour is picked at random, weighted by pixels hit per lap raised to the preset's _greed_. It normally carries at most one lap's worth of ammo, rounded to 10s or 5s, so it runs out on the track. With probability _bufferUse_ (while fewer than _maxBuffer_ are parked) it carries more, so it must go to the buffer and be sent out again later. A colour never gets more ammo than it has pixels left, so totals match pixel counts exactly.
+
+  New shooters are then dealt into random columns in deploy order, with column lengths kept within 1 of each other. That keeps every recorded deploy at the front of a column. A fraction (_mystery_) of shooters not at a column front become mystery shooters.
+
+- **Verification**: the stored solution is replayed in the shared simulation. It must clear the board with no power-ups, no overflow and no rejected moves. `tests/levels.test.ts` does this for every bundled level.
+- **Difficulty rating**: a greedy player (`sim.ts`) plays one shooter at a time. It always picks the visible shooter (column fronts and buffer) that hits the most pixels this lap. The generator tries up to 30 seeded attempts until the preset's requirement holds. If none does, it keeps the first attempt and reports "target missed".
+
+| Preset | greed | bufferUse | maxBuffer | mystery | Greedy player must |
+| ------ | ----- | --------- | --------- | ------- | ------------------ |
+| easy   | 3     | 0         | 0         | 0%      | win                |
+| medium | 1     | 0.25      | 2         | 5%      | either             |
+| hard   | 0.5   | 0.6       | 4         | 12%     | lose               |
+
+- **Starter levels**: 15 levels from 24×24 to 60×60: 4 easy, 5 medium and 6 hard. Level 14 (Mountains) is imported from `art/mountains.png`; the rest are drawn in code.
 
 ### 6.4 Editor (PC dev tool, later milestone)
 

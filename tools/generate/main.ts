@@ -1,18 +1,42 @@
-// Regenerates levels/*.json from the art in art.ts. Run with `pnpm levels`.
+// Regenerates levels/*.json from tools/generate/levels.ts. Run with `pnpm levels [id...]`.
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ARTS } from './art.ts';
-import { buildLevel, formatLevel } from './build.ts';
+import { generateLevel } from './build.ts';
+import { formatLevel } from './format.ts';
+import { levelSpecs } from './levels.ts';
 
+const only = process.argv.slice(2);
 const outDir = join(import.meta.dirname, '../../levels');
 mkdirSync(outDir, { recursive: true });
-for (const file of readdirSync(outDir)) if (file.endsWith('.json')) rmSync(join(outDir, file));
 
-for (const art of ARTS) {
-  const data = buildLevel(art);
-  const file = `${data.id}-${data.name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}.json`;
-  writeFileSync(join(outDir, file), formatLevel(data));
-  const pixels = data.grid.join('').replaceAll('.', '').length;
-  const shooters = data.queue.reduce((n, col) => n + col.length, 0);
-  console.log(`${file}: ${data.width}x${data.height}, ${pixels} pixels, ${shooters} shooters`);
+const fileName = (id: string, name: string): string =>
+  `${id}-${name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}.json`;
+const specs = levelSpecs().filter((s) => !only.length || only.includes(s.id));
+
+if (!only.length) {
+  // Full rebuild: remove files for levels that no longer exist.
+  const keep = new Set(specs.map((s) => fileName(s.id, s.name)));
+  for (const file of readdirSync(outDir)) if (file.endsWith('.json') && !keep.has(file)) rmSync(join(outDir, file));
 }
+
+const rows: Record<string, string | number>[] = [];
+for (const spec of specs) {
+  const started = performance.now();
+  const { data, stats } = generateLevel(spec);
+  writeFileSync(join(outDir, fileName(data.id, data.name)), formatLevel(data));
+  rows.push({
+    level: `${data.id} ${data.name}`,
+    size: `${data.width}x${data.height}`,
+    difficulty: spec.difficulty,
+    colours: data.palette.length,
+    pixels: stats.pixels,
+    shooters: stats.shooters,
+    'buffer peak': stats.bufferPeak,
+    redeploys: stats.bufferRedeploys,
+    mystery: stats.mystery,
+    greedy: stats.greedyWon ? 'wins' : 'loses',
+    attempt: stats.attempt + (stats.metTarget ? '' : ' (target missed)'),
+    ms: Math.round(performance.now() - started),
+  });
+}
+console.table(rows);

@@ -209,3 +209,19 @@ button {
   background: var(--accent);
   color: #0c0e13;
 }
+
+.level .size b {
+  font-weight: 600;
+}
+
+.level .size .easy {
+  color: var(--good);
+}
+
+.level .size .medium {
+  color: #ffb74d;
+}
+
+.level .size .hard {
+  color: var(--danger);
+}

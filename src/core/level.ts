@@ -88,6 +88,7 @@ export function parseLevel(data: LevelData, options: ParseOptions = {}): Level {
   return {
     id: data.id,
     name: data.name,
+    difficulty: data.difficulty,
     width,
     height,
     palette: [...palette],

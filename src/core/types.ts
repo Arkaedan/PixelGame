@@ -15,6 +15,8 @@ export const RULES = {
 /** Grid cell value for "no pixel". */
 export const EMPTY = -1;
 
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
 export type PowerUpKind = 'extraSlot' | 'pickAny' | 'reveal';
 
 /** A shooter as written in a level file. */
@@ -45,6 +47,7 @@ export interface TimedAction {
 export interface LevelData {
   id: string;
   name: string;
+  difficulty?: Difficulty;
   width: number;
   height: number;
   palette: string[];
@@ -69,6 +72,7 @@ export type TrackSlot = { kind: 'corner' } | { kind: 'line'; side: Side; index: 
 export interface Level {
   id: string;
   name: string;
+  difficulty?: Difficulty;
   width: number;
   height: number;
   palette: string[];
