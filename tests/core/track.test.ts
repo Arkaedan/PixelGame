@@ -9,15 +9,11 @@ describe('track layout', () => {
     expect(slots).toHaveLength(trackLength(w, h));
     expect(slots).toHaveLength(14);
     const corners = slots.flatMap((s, i) => (s.kind === 'corner' ? [i] : []));
-    expect(corners).toEqual([0, w + 1, w + h + 2, 2 * w + h + 3]);
+    expect(corners).toEqual([0, h + 1, w + h + 2, w + 2 * h + 3]);
   });
 
-  it('runs clockwise from the bottom-left corner', () => {
+  it('runs anticlockwise from the bottom-right corner: up, left, down, then right', () => {
     expect(buildSlots(3, 2).slice(1)).toEqual([
-      { kind: 'line', side: 'bottom', index: 0 },
-      { kind: 'line', side: 'bottom', index: 1 },
-      { kind: 'line', side: 'bottom', index: 2 },
-      { kind: 'corner' },
       { kind: 'line', side: 'right', index: 1 },
       { kind: 'line', side: 'right', index: 0 },
       { kind: 'corner' },
@@ -27,6 +23,10 @@ describe('track layout', () => {
       { kind: 'corner' },
       { kind: 'line', side: 'left', index: 0 },
       { kind: 'line', side: 'left', index: 1 },
+      { kind: 'corner' },
+      { kind: 'line', side: 'bottom', index: 0 },
+      { kind: 'line', side: 'bottom', index: 1 },
+      { kind: 'line', side: 'bottom', index: 2 },
     ]);
   });
 

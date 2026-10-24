@@ -3,6 +3,7 @@ import type { Level } from './core/index.ts';
 import { LEVELS } from './game/levels.ts';
 import { Sfx } from './game/audio.ts';
 import { GameScreen } from './game/screen.ts';
+import { bindSoundAndVibration, soundAndVibrationRows } from './game/settings-ui.ts';
 import { escapeHtml, plural } from './game/text.ts';
 import { ProgressStore, totalPowerUps } from './storage/progress.ts';
 import { SettingsStore, type Settings } from './storage/settings.ts';
@@ -66,7 +67,7 @@ function play(index: number): void {
     levelNumber: index + 1,
     hasNext: index + 1 < LEVELS.length,
     progress,
-    settings: settings.get(),
+    settings,
     sfx,
     onExit: () => history.back(),
     onNext: () => {
@@ -81,16 +82,10 @@ function showSettings(): void {
   const sheet = document.createElement('div');
   sheet.className = 'sheet';
   const render = (s: Settings): void => {
-    const toggle = (key: 'sound' | 'haptics', label: string): string => `
-      <label class="row">
-        <span>${label}</span>
-        <input type="checkbox" data-key="${key}" ${s[key] ? 'checked' : ''} />
-      </label>`;
     sheet.innerHTML = `
       <div class="card settings" role="dialog" aria-label="Settings">
         <h2>Settings</h2>
-        ${toggle('sound', 'Sound')}
-        ${toggle('haptics', 'Vibration')}
+        ${soundAndVibrationRows(s)}
         <div class="row">
           <span>Starting speed</span>
           <div class="segmented">
@@ -103,17 +98,7 @@ function showSettings(): void {
       </div>`;
   };
   render(settings.get());
-  sheet.addEventListener('change', (e) => {
-    if (!(e.target instanceof HTMLInputElement)) return;
-    const key = e.target.dataset['key'];
-    if (key !== 'sound' && key !== 'haptics') return;
-    const updated = settings.update({ [key]: e.target.checked });
-    sfx.enabled = updated.sound;
-    if (key === 'sound' && updated.sound) {
-      sfx.unlock();
-      sfx.play('deploy');
-    }
-  });
+  bindSoundAndVibration(sheet, settings, sfx);
   sheet.addEventListener('click', (e) => {
     if (!(e.target instanceof Element)) return;
     const speed = e.target.closest<HTMLElement>('[data-speed]')?.dataset['speed'];

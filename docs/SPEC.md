@@ -23,7 +23,7 @@ A phone-first puzzle game: clear a pixel-art grid by sending coloured shooters a
 ### 2.1 Track
 
 - The track has one position for each board column along the top and bottom sides, one for each board row along the left and right sides, plus 4 corners. Lap length = `2W + 2H + 4`.
-- Shooters **enter at the bottom-left corner**, travel **clockwise** (right along the bottom, up the right side, left along the top, down the left side), and leave at the same corner.
+- Shooters **enter at the bottom-right corner** and travel **anticlockwise** on screen: up the right side, left along the top, down the left side, then right along the bottom, leaving at the same corner. (Earlier drafts called this direction "clockwise" by mistake; the direction itself has not changed.)
 - Shooters move at the same constant speed. A deployed shooter waits at the entry until the nearest shooter is at least the **entry gap** away: one position per 16 cells of the board's longest side (1 on boards up to 16, 2 on 24×24, 4 on 60×60), so tokens don't overlap on big boards. Waiting shooters still count towards track capacity.
 - Movement and shooting run on a **fixed-timestep, deterministic simulation** (integer ticks), and rendering interpolates between ticks for smooth motion. The same deploy timings always give the same result, which makes the solver, replays and tests possible.
 
@@ -39,8 +39,8 @@ A phone-first puzzle game: clear a pixel-art grid by sending coloured shooters a
 
 1. **Queue → Track**: tap the front shooter of any column, if the number of shooters on the track is below capacity.
 2. **On track**: shoots as above. When **ammo reaches 0 it disappears** at once.
-3. **Lap complete with ammo left → Buffer**. If the buffer is **full (5)**, the level is **failed**.
-4. **Buffer → Track**: tap a buffered shooter to redeploy it, which also needs a free track slot. It keeps its remaining ammo.
+3. **Lap complete with ammo left → Buffer**. The buffer **fills from the right**. If it is **full (5)**, the level is **failed**.
+4. **Buffer → Track**: tap a buffered shooter to redeploy it, which also needs a free track slot. It keeps its remaining ammo. The shooters to its left **slide right** to close the gap, so the buffer is always packed against its right side, with the longest-waiting shooter rightmost.
 
 ### 2.4 Win / lose
 
@@ -57,7 +57,8 @@ A phone-first puzzle game: clear a pixel-art grid by sending coloured shooters a
 ### 2.6 Pacing
 
 - Real-time, with a **speed toggle** (1× / 2× / 4×) and **pause**.
-- The base speed is tuned so a lap on a 24×24 board takes about 8 s at 1×. Bigger boards have longer laps, so large levels are long, by design.
+- Each step takes 23 ms at 1×, so a lap on a 24×24 board takes about 2.3 s (about 3.5 times the first prototype speed). Bigger boards have longer laps, so large levels are long, by design.
+- **Pause** opens a menu with Resume, Restart and Levels, plus the sound and vibration switches.
 
 ---
 
@@ -199,7 +200,7 @@ Feel (milestone 5):
   - each hit plays a pentatonic note chosen by colour, at most one per 35 ms;
   - deploy, run-out, buffer, reject, power-up, win and lose each have their own sound.
 - **Haptics:** short `navigator.vibrate` pulses on deploy, a full track, power-ups, a win and a loss.
-- **Settings** (⚙ on the level list, saved as `pixelgame.settings.v1`): sound on or off, vibration on or off, and the speed a level starts at (1×, 2× or 4×).
+- **Settings** (⚙ on the level list, saved as `pixelgame.settings.v1`): sound on or off, vibration on or off, and the speed a level starts at (1×, 2× or 4×). Sound and vibration can also be switched from the pause menu.
 
 ---
 
@@ -241,8 +242,9 @@ Later ideas: in-game editor, level share codes, more power-ups or mechanics, Cap
 
 ## 10. Defaults chosen (confirm or change)
 
-- Entry at the bottom-left corner, clockwise travel.
-- Lap of about 8 s at 1× on 24×24; speed per cell is fixed, so bigger boards have longer laps.
+- Entry at the bottom-right corner, anticlockwise travel (changed from bottom-left after play-testing).
+- Lap of about 2.3 s at 1× on 24×24 (sped up from 8 s after play-testing); speed per cell is fixed, so bigger boards have longer laps.
+- The buffer fills from the right and stays packed to the right (changed after play-testing).
 - Pick Any covers **visible** shooters only (combine with Reveal for deeper ones).
 - Mystery shooters reveal on reaching the front row.
 - A blocked deploy (entry too close) waits rather than being refused; the entry gap scales with board size.

@@ -13,7 +13,16 @@ export const THEME = {
   accent: '#7c9cff',
 };
 
-export const EFFECT_MS = { pop: 220, tracer: 140, fade: 260, flight: 200, landing: 260, confetti: 1800, shake: 420 };
+export const EFFECT_MS = {
+  pop: 220,
+  tracer: 140,
+  fade: 260,
+  flight: 200,
+  landing: 260,
+  slide: 180,
+  confetti: 1800,
+  shake: 420,
+};
 
 export interface Pop {
   cell: number;
@@ -43,6 +52,13 @@ export interface Flight {
   t: number;
 }
 
+/** A buffered shooter sliding right after one to its right was sent out. */
+export interface Slide {
+  from: number;
+  to: number;
+  t: number;
+}
+
 /** A shooter arriving in a buffer slot. */
 export interface Landing {
   slot: number;
@@ -66,15 +82,15 @@ export interface Effects {
   fades: Fade[];
   flights: Flight[];
   landings: Landing[];
+  slides: Slide[];
   confetti: Confetti[];
 }
 
 export function noEffects(): Effects {
-  return { pops: [], tracers: [], fades: [], flights: [], landings: [], confetti: [] };
+  return { pops: [], tracers: [], fades: [], flights: [], landings: [], slides: [], confetti: [] };
 }
 
 export interface Overlay {
-  paused: boolean;
   /** Highlight the track counter in red until this time (a rejected deploy). */
   flashUntil: number;
   /** Pick Any is armed: highlight shooters that can be picked from behind the front. */
@@ -183,7 +199,14 @@ export function draw(
     const landing = effects.landings.find((l) => l.slot === i);
     const k = landing ? Math.min(1, (now - landing.t) / EFFECT_MS.landing) : 1;
     const size = r.w * 0.78 * (0.4 + 0.6 * easeOutBack(k));
-    drawToken(ctx, { x: r.x + r.w / 2, y: r.y + r.h / 2 }, size, palette[s.color]!, String(s.ammo));
+    let x = r.x + r.w / 2;
+    const slide = effects.slides.find((sl) => sl.to === i);
+    if (slide) {
+      const from = layout.buffer[slide.from]!;
+      const e = easeOut(Math.min(1, (now - slide.t) / EFFECT_MS.slide));
+      x = from.x + from.w / 2 + (x - from.x - from.w / 2) * e;
+    }
+    drawToken(ctx, { x, y: r.y + r.h / 2 }, size, palette[s.color]!, String(s.ammo));
   });
 
   for (const f of effects.flights) {
@@ -221,14 +244,6 @@ export function draw(
   }
   ctx.globalAlpha = 1;
   ctx.restore();
-
-  if (overlay.paused) {
-    ctx.fillStyle = 'rgba(10,12,16,0.6)';
-    ctx.fillRect(0, 0, layout.width, layout.height);
-    ctx.fillStyle = THEME.text;
-    ctx.font = `700 28px system-ui, sans-serif`;
-    ctx.fillText('Paused', layout.width / 2, board.y + board.h / 2);
-  }
 }
 
 function drawBoard(ctx: CanvasRenderingContext2D, state: GameState, layout: Layout): void {
@@ -312,13 +327,19 @@ function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number
 }
 
 function drawEntryMarker(ctx: CanvasRenderingContext2D, layout: Layout): void {
+  // A small arrow on the entry corner, pointing the way shooters travel.
   const p = layout.track[0]!;
+  const next = layout.track[1]!;
   const s = layout.band * 0.28;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(Math.atan2(next.y - p.y, next.x - p.x));
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.beginPath();
-  ctx.moveTo(p.x - s * 0.6, p.y - s);
-  ctx.lineTo(p.x + s, p.y);
-  ctx.lineTo(p.x - s * 0.6, p.y + s);
+  ctx.moveTo(-s * 0.6, -s);
+  ctx.lineTo(s, 0);
+  ctx.lineTo(-s * 0.6, s);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
 }

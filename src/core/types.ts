@@ -110,6 +110,7 @@ export interface GameState {
   cells: Int16Array;
   remaining: number;
   queue: Shooter[][];
+  /** Fills from the right and stays packed there: occupied slots are always the rightmost ones. */
   buffer: (Shooter | null)[];
   /** Shooters on the track, furthest along first. */
   track: TrackShooter[];

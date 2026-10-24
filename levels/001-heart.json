@@ -32,27 +32,29 @@
     "........................"
   ],
   "queue": [
-    [{"c":2,"a":50},{"c":1,"a":10},{"c":2,"a":5}],
-    [{"c":0,"a":60},{"c":0,"a":50},{"c":0,"a":20}],
-    [{"c":0,"a":30},{"c":1,"a":10},{"c":0,"a":10}],
-    [{"c":0,"a":40},{"c":0,"a":3},{"c":1,"a":1}],
-    [{"c":0,"a":40},{"c":0,"a":10},{"c":2,"a":3}]
+    [{"c":0,"a":20},{"c":0,"a":20},{"c":0,"a":10}],
+    [{"c":2,"a":50},{"c":0,"a":40},{"c":0,"a":3}],
+    [{"c":0,"a":60},{"c":0,"a":30},{"c":1,"a":5}],
+    [{"c":1,"a":10},{"c":0,"a":10},{"c":2,"a":5}],
+    [{"c":0,"a":50},{"c":0,"a":20},{"c":1,"a":5},{"c":2,"a":3},{"c":1,"a":1}]
   ],
   "solution": [
-    {"tick":0,"action":{"type":"deployQueue","column":0}},
-    {"tick":73,"action":{"type":"deployQueue","column":1}},
-    {"tick":165,"action":{"type":"deployQueue","column":1}},
-    {"tick":237,"action":{"type":"deployQueue","column":3}},
-    {"tick":305,"action":{"type":"deployQueue","column":4}},
-    {"tick":377,"action":{"type":"deployQueue","column":2}},
-    {"tick":447,"action":{"type":"deployQueue","column":1}},
-    {"tick":512,"action":{"type":"deployQueue","column":4}},
-    {"tick":577,"action":{"type":"deployQueue","column":2}},
-    {"tick":646,"action":{"type":"deployQueue","column":0}},
-    {"tick":716,"action":{"type":"deployQueue","column":0}},
-    {"tick":763,"action":{"type":"deployQueue","column":2}},
-    {"tick":836,"action":{"type":"deployQueue","column":4}},
-    {"tick":881,"action":{"type":"deployQueue","column":3}},
-    {"tick":925,"action":{"type":"deployQueue","column":3}}
+    {"tick":0,"action":{"type":"deployQueue","column":1}},
+    {"tick":66,"action":{"type":"deployQueue","column":2}},
+    {"tick":163,"action":{"type":"deployQueue","column":4}},
+    {"tick":255,"action":{"type":"deployQueue","column":1}},
+    {"tick":345,"action":{"type":"deployQueue","column":2}},
+    {"tick":411,"action":{"type":"deployQueue","column":4}},
+    {"tick":452,"action":{"type":"deployQueue","column":0}},
+    {"tick":516,"action":{"type":"deployQueue","column":0}},
+    {"tick":606,"action":{"type":"deployQueue","column":3}},
+    {"tick":665,"action":{"type":"deployQueue","column":0}},
+    {"tick":705,"action":{"type":"deployQueue","column":4}},
+    {"tick":748,"action":{"type":"deployQueue","column":3}},
+    {"tick":811,"action":{"type":"deployQueue","column":3}},
+    {"tick":820,"action":{"type":"deployQueue","column":2}},
+    {"tick":865,"action":{"type":"deployQueue","column":4}},
+    {"tick":935,"action":{"type":"deployQueue","column":1}},
+    {"tick":947,"action":{"type":"deployQueue","column":4}}
   ]
 }

@@ -86,7 +86,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       const shooter = state.buffer[action.slot];
       if (!shooter) return fail('empty-slot');
       if (onTrackCount(state) >= state.capacity) return fail('track-full');
-      state.buffer[action.slot] = null;
+      // The buffer stays packed against the right: shooters to the left of the gap slide right.
+      for (let i = action.slot; i > 0; i--) state.buffer[i] = state.buffer[i - 1]!;
+      state.buffer[0] = null;
       state.pending.push(shooter);
       return OK;
     }
@@ -124,7 +126,8 @@ export function step(state: GameState): GameEvent[] {
       state.track.push(t);
       continue;
     }
-    const slot = state.buffer.indexOf(null);
+    // The buffer fills from the right and stays packed, so the last gap is the next free slot.
+    const slot = state.buffer.lastIndexOf(null);
     if (slot === -1) {
       lose(state, 'overflow', events);
       return events;

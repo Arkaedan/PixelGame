@@ -57,14 +57,15 @@ export function computeLayout(width: number, height: number, level: Level): Layo
   const right = board.x + bw + band / 2;
   const top = board.y - band / 2;
   const bottom = board.y + bh + band / 2;
-  const track: Point[] = [{ x: left, y: bottom }];
-  for (let x = 0; x < level.width; x++) track.push({ x: board.x + (x + 0.5) * cell, y: bottom });
-  track.push({ x: right, y: bottom });
+  // Same order as buildSlots in core/track.ts: from the bottom-right corner, up, left, down, right.
+  const track: Point[] = [{ x: right, y: bottom }];
   for (let y = level.height - 1; y >= 0; y--) track.push({ x: right, y: board.y + (y + 0.5) * cell });
   track.push({ x: right, y: top });
   for (let x = level.width - 1; x >= 0; x--) track.push({ x: board.x + (x + 0.5) * cell, y: top });
   track.push({ x: left, y: top });
   for (let y = 0; y < level.height; y++) track.push({ x: left, y: board.y + (y + 0.5) * cell });
+  track.push({ x: left, y: bottom });
+  for (let x = 0; x < level.width; x++) track.push({ x: board.x + (x + 0.5) * cell, y: bottom });
 
   const bufferTop = PAD + region + PAD;
   const bufferW = level.bufferSize * slot + Math.max(0, level.bufferSize - 1) * GAP;

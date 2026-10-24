@@ -460,3 +460,29 @@ button {
     transition: none !important;
   }
 }
+
+/* Pause menu */
+
+.pause {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(10 12 16 / 0.6);
+  animation: fade-in 160ms ease-out;
+}
+
+.pause[hidden] {
+  display: none;
+}
+
+.pause .card h2 {
+  margin-bottom: 10px;
+}
+
+.pause-settings {
+  margin-bottom: 14px;
+  text-align: left;
+}

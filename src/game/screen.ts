@@ -10,14 +10,15 @@ import {
   type PowerUpKind,
 } from '../core/index.ts';
 import { totalPowerUps, type ClearRecord, type ProgressStore } from '../storage/progress.ts';
-import type { Settings } from '../storage/settings.ts';
+import type { SettingsStore } from '../storage/settings.ts';
 import type { Sfx } from './audio.ts';
 import { cellCentre, computeLayout, contains, queueTiles, type Layout, type Point } from './layout.ts';
 import { draw, EFFECT_MS, noEffects, type Effects } from './render.ts';
+import { bindSoundAndVibration, soundAndVibrationRows } from './settings-ui.ts';
 import { describePowerUps, escapeHtml, formatDuration, plural, POWER_UP_NAMES } from './text.ts';
 
-/** Simulation step length at 1× speed. A 24×24 lap (100 positions) takes about 8 s. */
-export const TICK_MS = 80;
+/** Simulation step length at 1× speed. A 24×24 lap (100 positions) takes about 2.3 s. */
+export const TICK_MS = 23;
 const SPEEDS = [1, 2, 4];
 /** Pause between the last move and the result card, so the final pop is visible. */
 const RESULT_DELAY_MS = 700;
@@ -26,7 +27,7 @@ export interface GameScreenOptions {
   levelNumber: number;
   hasNext: boolean;
   progress: ProgressStore;
-  settings: Settings;
+  settings: SettingsStore;
   sfx: Sfx;
   onExit: () => void;
   onNext: () => void;
@@ -40,6 +41,7 @@ export class GameScreen {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly resultEl: HTMLElement;
+  private readonly pauseEl: HTMLElement;
   private readonly speedBtn: HTMLButtonElement;
   private readonly pauseBtn: HTMLButtonElement;
   private readonly powerUpBar: HTMLElement;
@@ -62,7 +64,7 @@ export class GameScreen {
   constructor(container: HTMLElement, level: Level, options: GameScreenOptions) {
     this.level = level;
     this.options = options;
-    this.speed = Math.max(0, SPEEDS.indexOf(options.settings.speed));
+    this.speed = Math.max(0, SPEEDS.indexOf(options.settings.get().speed));
     this.root = document.createElement('div');
     this.root.className = 'game';
     this.root.innerHTML = `
@@ -84,12 +86,24 @@ export class GameScreen {
           </button>`,
         ).join('')}
       </footer>
-      <div class="result" hidden></div>`;
+      <div class="result" hidden></div>
+      <div class="pause" hidden>
+        <div class="card" role="dialog" aria-label="Paused">
+          <h2>Paused</h2>
+          <div class="pause-settings"></div>
+          <div class="actions">
+            <button class="primary" data-act="resume">Resume</button>
+            <button data-act="restart">Restart</button>
+            <button data-act="levels">Levels</button>
+          </div>
+        </div>
+      </div>`;
     container.append(this.root);
 
     this.canvas = this.root.querySelector('canvas')!;
     this.ctx = this.canvas.getContext('2d')!;
     this.resultEl = this.root.querySelector('.result')!;
+    this.pauseEl = this.root.querySelector('.pause')!;
     this.speedBtn = this.root.querySelector('[data-act="speed"]')!;
     this.pauseBtn = this.root.querySelector('[data-act="pause"]')!;
     this.powerUpBar = this.root.querySelector('.powerups')!;
@@ -108,6 +122,13 @@ export class GameScreen {
       else if (act === 'next') this.options.onNext();
       else if (act === 'levels') this.options.onExit();
     });
+    this.pauseEl.addEventListener('click', (e) => {
+      const act = actionOf(e);
+      if (act === 'resume') this.setPaused(false);
+      else if (act === 'restart') this.restart();
+      else if (act === 'levels') this.options.onExit();
+    });
+    bindSoundAndVibration(this.pauseEl, options.settings, options.sfx);
     this.canvas.addEventListener('pointerdown', (e) => this.onTap(e.offsetX, e.offsetY));
     // Browsers only allow audio after a user gesture.
     this.root.addEventListener('pointerdown', () => this.options.sfx.unlock());
@@ -161,9 +182,15 @@ export class GameScreen {
     this.speedBtn.textContent = `${SPEEDS[this.speed]}×`;
   }
 
+  /** Pausing opens the pause menu, which also has the sound and vibration switches. */
   private setPaused(paused: boolean): void {
+    if (paused && this.state.status !== 'playing') return;
     this.paused = paused;
     this.pauseBtn.textContent = paused ? '▶' : '❚❚';
+    if (paused) {
+      this.pauseEl.querySelector('.pause-settings')!.innerHTML = soundAndVibrationRows(this.options.settings.get());
+    }
+    this.pauseEl.hidden = !paused;
   }
 
   private usePowerUp(act: string | undefined): void {
@@ -199,9 +226,14 @@ export class GameScreen {
     let action: Action | undefined;
     // Where the deployed shooter's token flies from, and how big it starts.
     let from: { at: Point; size: number } | undefined;
+    const slides: { from: number; to: number }[] = [];
     const slot = this.layout.buffer.findIndex((r) => contains(r, p));
     if (slot !== -1) {
       action = { type: 'deployBuffer', slot };
+      // Shooters to the left of the one sent out slide right to close the gap.
+      for (let i = 1; i <= slot; i++) {
+        if (this.state.buffer[i - 1]) slides.push({ from: i - 1, to: i });
+      }
       const r = this.layout.buffer[slot]!;
       from = { at: { x: r.x + r.w / 2, y: r.y + r.h / 2 }, size: r.w * 0.78 };
     }
@@ -232,6 +264,8 @@ export class GameScreen {
           t: now,
         });
       }
+      const now = performance.now();
+      this.effects.slides = slides.map((sl) => ({ from: sl.from, to: sl.to, t: now }));
       this.options.sfx.play('deploy');
       this.buzz(8);
       if (action.type === 'deployQueue') this.picking = false;
@@ -244,7 +278,7 @@ export class GameScreen {
   }
 
   private buzz(pattern: number | number[]): void {
-    if (!this.options.settings.haptics) return;
+    if (!this.options.settings.get().haptics) return;
     try {
       navigator.vibrate?.(pattern);
     } catch {
@@ -266,7 +300,6 @@ export class GameScreen {
     this.pruneEffects(now);
     if (this.layout) {
       draw(this.ctx, this.state, this.layout, this.acc / TICK_MS, now, this.effects, {
-        paused: this.paused,
         flashUntil: this.flashUntil,
         pickAny: this.picking,
         shakeUntil: this.shakeUntil,
@@ -334,6 +367,7 @@ export class GameScreen {
     if (fx.fades.length) fx.fades = fx.fades.filter((f) => now - f.t < EFFECT_MS.fade);
     if (fx.flights.length) fx.flights = fx.flights.filter((f) => now - f.t < EFFECT_MS.flight);
     if (fx.landings.length) fx.landings = fx.landings.filter((l) => now - l.t < EFFECT_MS.landing);
+    if (fx.slides.length) fx.slides = fx.slides.filter((sl) => now - sl.t < EFFECT_MS.slide);
     if (fx.confetti.length) fx.confetti = fx.confetti.filter((c) => now - c.t < EFFECT_MS.confetti);
   }
 

@@ -10,15 +10,16 @@ describe('shooting', () => {
     expect(applyAction(s, deploy(0))).toEqual({ ok: true });
 
     expect(step(s)).toEqual([{ type: 'enter', shooterId: 0 }]);
-    // positions 1..3 face columns 0..2 from below
-    expect(run(s, 2).map((e) => e.type)).toEqual(['shot', 'shot']);
+    // pos 1 faces the row from the right (hits col 2), pos 2 is a corner,
+    // pos 3-5 face columns 2..0 from the top (col 2 is already empty)
+    expect(run(s, 4).map((e) => e.type)).toEqual(['shot', 'shot']);
     expect(step(s)).toEqual([
-      { type: 'shot', shooterId: 0, cell: 2, color: RED, pos: 3 },
-      { type: 'exhausted', shooterId: 0, color: RED, pos: 3 },
+      { type: 'shot', shooterId: 0, cell: 0, color: RED, pos: 5 },
+      { type: 'exhausted', shooterId: 0, color: RED, pos: 5 },
       { type: 'won' },
     ]);
     expect(s.status).toBe('won');
-    expect(s.tick).toBe(4);
+    expect(s.tick).toBe(6);
     expect(s.track).toEqual([]);
   });
 
@@ -26,26 +27,26 @@ describe('shooting', () => {
     // red column in the middle, walled by blue on both sides
     const s = game(['101', '101'], [[{ c: RED, a: 2 }], [{ c: BLUE, a: 4 }]]);
     applyAction(s, deploy(0));
-    run(s, 3); // enter, bottom col 0 (blue first: blocked), bottom col 1
-    expect(boardRows(s)).toEqual(['101', '1.1']);
+    run(s, 6); // enter, right side (blue first), corner, top col 2 (blue), top col 1
+    expect(boardRows(s)).toEqual(['1.1', '101']);
     expect(s.track[0]!.shooter.ammo).toBe(1);
 
-    run(s, 6); // rest of bottom, right side (blue first), corner, top col 2 (blue)
-    expect(boardRows(s)).toEqual(['101', '1.1']);
-    step(s); // top col 1
+    run(s, 6); // top col 0 (blue), corner, left side (blue), corner, bottom col 0 (blue)
+    expect(boardRows(s)).toEqual(['1.1', '101']);
+    step(s); // bottom col 1
     expect(boardRows(s)).toEqual(['1.1', '1.1']);
     expect(s.track).toEqual([]);
     expect(s.status).toBe('playing');
   });
 
   it('hits exposed pixels from the side', () => {
-    const s = game(['0', '1'], [[{ c: RED, a: 1 }], [{ c: BLUE, a: 1 }]]);
+    const s = game(['1', '0'], [[{ c: RED, a: 1 }], [{ c: BLUE, a: 1 }]]);
     applyAction(s, deploy(0));
-    // 1x2 board: pos 1 bottom (blue first), pos 3 right row 1 (blue), pos 4 right row 0 (red)
-    run(s, 4);
-    expect(boardRows(s)).toEqual(['0', '1']);
+    // 1x2 board: pos 1 faces row 1 from the right (red), before reaching the top or bottom
     step(s);
-    expect(boardRows(s)).toEqual(['.', '1']);
+    expect(boardRows(s)).toEqual(['1', '0']);
+    step(s);
+    expect(boardRows(s)).toEqual(['1', '.']);
   });
 });
 
@@ -55,13 +56,27 @@ describe('lap and buffer', () => {
     applyAction(s, deploy(0));
     run(s, 8); // lap length on a 1x1 board is 8
     expect(s.track).toHaveLength(1);
-    expect(step(s)).toEqual([{ type: 'buffered', shooterId: 0, slot: 0 }]);
-    expect(s.buffer[0]).toMatchObject({ color: RED, ammo: 5 });
+    // the buffer fills from the right
+    expect(step(s)).toEqual([{ type: 'buffered', shooterId: 0, slot: 4 }]);
+    expect(s.buffer[4]).toMatchObject({ color: RED, ammo: 5 });
 
-    expect(applyAction(s, { type: 'deployBuffer', slot: 0 })).toEqual({ ok: true });
-    expect(s.buffer[0]).toBeNull();
+    expect(applyAction(s, { type: 'deployBuffer', slot: 4 })).toEqual({ ok: true });
+    expect(s.buffer[4]).toBeNull();
     step(s);
     expect(s.track[0]).toMatchObject({ pos: 0, shooter: { ammo: 5 } });
+  });
+
+  it('keeps the buffer packed to the right when a shooter leaves', () => {
+    const red = { c: RED, a: 5 };
+    const s = game(['1'], [[red, red, red], [{ c: BLUE, a: 1 }]]);
+    for (let i = 0; i < 3; i++) applyAction(s, deploy(0));
+    run(s, 11); // they enter on ticks 1-3 and finish their laps on ticks 9-11
+    expect(s.buffer.map((b) => b?.id ?? null)).toEqual([null, null, 2, 1, 0]);
+
+    applyAction(s, { type: 'deployBuffer', slot: 3 });
+    expect(s.buffer.map((b) => b?.id ?? null)).toEqual([null, null, null, 2, 0]);
+    applyAction(s, { type: 'deployBuffer', slot: 4 });
+    expect(s.buffer.map((b) => b?.id ?? null)).toEqual([null, null, null, null, 2]);
   });
 
   it('fails when a shooter finishes its lap with the buffer full', () => {

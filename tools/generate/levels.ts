@@ -20,7 +20,7 @@ export function levelSpecs(): LevelSpec[] {
     { id: '010', name: 'Target', difficulty: 'hard', seed: 10, art: art.target() },
     { id: '011', name: 'Planet', difficulty: 'hard', seed: 12, art: art.planet() },
     { id: '012', name: 'Argyle', difficulty: 'hard', seed: 12, art: art.argyle() },
-    { id: '013', name: 'House', difficulty: 'hard', seed: 13, art: art.house() },
+    { id: '013', name: 'House', difficulty: 'hard', seed: 14, art: art.house() },
     {
       id: '014',
       name: 'Mountains',
