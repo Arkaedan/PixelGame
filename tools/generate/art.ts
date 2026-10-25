@@ -1,4 +1,6 @@
 // Original pixel art for the starter levels, drawn with Painter. Palette index 0 is listed first.
+// Boards are 30, 40, 50 or 60 cells square; some drawings were designed on another grid and are
+// scaled to fit (the third Painter argument).
 import type { Art } from './build.ts';
 import { Painter } from './paint.ts';
 import { createRng, randomInt } from './rng.ts';
@@ -27,8 +29,8 @@ const C = {
 };
 
 export function heart(): Art {
-  const size = 24;
-  return new Painter(size)
+  const size = 24; // design grid
+  return new Painter(30, 30, size)
     .fill(0, (px, py) => {
       const u = (px / size) * 2.5 - 1.25;
       const v = 1.2 - (py / size) * 2.45;
@@ -41,7 +43,7 @@ export function heart(): Art {
 
 export function smiley(): Art {
   const c = 14;
-  return new Painter(28)
+  return new Painter(30, 30, 28)
     .circle(c, c, 13.6, 2)
     .circle(c, c, 12.2, 0)
     .ellipse(c - 4.5, 10, 1.6, 2.6, 1)
@@ -53,18 +55,23 @@ export function smiley(): Art {
     .toArt([C.yellow, C.darkBrown, C.orange]);
 }
 
+/** 10×10 blocks, each four 5×5 squares in two colours on the diagonals (50 pixels per colour pair). */
 export function quilt(): Art {
-  const tile = 6;
-  return new Painter(24)
-    .fill((x, y) => (Math.floor(x / tile) * 3 + Math.floor(y / tile)) % 4)
+  return new Painter(30)
+    .fill((x, y) => {
+      const a = (Math.floor(x / 10) + 2 * Math.floor(y / 10)) % 4;
+      const sameDiagonal = Math.floor(x / 5) % 2 === Math.floor(y / 5) % 2;
+      return sameDiagonal ? a : (a + 2) % 4;
+    })
     .toArt([C.blue, C.yellow, C.red, C.green]);
 }
 
 export function sunset(): Art {
   const horizon = 20;
   const sky = [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6];
-  return new Painter(32)
-    .fill((_, y) => {
+  return new Painter(30, 30, 32)
+    .fill((_x, _y, _px, py) => {
+      const y = Math.floor(py);
       if (y < horizon) return sky[y]!;
       return (y - horizon) % 4 < 2 ? 1 : 0;
     })
@@ -77,7 +84,7 @@ export function sunset(): Art {
 }
 
 export function mushroom(): Art {
-  return new Painter(32)
+  return new Painter(40, 40, 32)
     .rect(0, 29, 32, 3, 4)
     .ellipse(16, 15, 14, 11.5, 0)
     .fill(-1, (_, py) => py > 15 && py < 29)
@@ -94,7 +101,7 @@ export function mushroom(): Art {
 
 export function rainbow(): Art {
   const bands = [C.purple, C.blue, C.green, C.yellow, C.orange, C.red];
-  const p = new Painter(36);
+  const p = new Painter(40, 40, 36);
   // Outermost band first, so each smaller band paints over the inside of the previous one.
   for (let i = bands.length - 1; i >= 0; i--) {
     p.fill(i, (px, py) => py < 29 && Math.hypot(px - 18, py - 29) <= 6 + (i + 1) * 2);
@@ -114,7 +121,7 @@ export function rainbow(): Art {
 }
 
 export function cat(): Art {
-  return new Painter(36)
+  return new Painter(40, 40, 36)
     .polygon(
       [
         [5, 17],
@@ -233,10 +240,11 @@ export function fish(): Art {
 }
 
 export function target(): Art {
-  const size = 44;
+  const size = 50;
+  const ring = 5;
   const centre = size / 2;
   return new Painter(size)
-    .fill((x, y) => Math.floor(Math.max(Math.abs(x + 0.5 - centre), Math.abs(y + 0.5 - centre)) / 4) % 5)
+    .fill((x, y) => Math.floor(Math.max(Math.abs(x + 0.5 - centre), Math.abs(y + 0.5 - centre)) / ring) % 5)
     .toArt([C.red, C.white, C.blue, C.yellow, C.black]);
 }
 
@@ -249,11 +257,11 @@ function planetRing(px: number, py: number): boolean {
 
 export function planet(): Art {
   const rng = createRng(48);
-  const p = new Painter(48);
-  for (let i = 0; i < 40; i++) p.set(randomInt(rng, 0, 47), randomInt(rng, 0, 47), i % 3 === 0 ? 5 : 4);
+  const p = new Painter(50, 50, 48);
+  for (let i = 0; i < 40; i++) p.set(randomInt(rng, 0, 49), randomInt(rng, 0, 49), i % 3 === 0 ? 5 : 4);
   p.fill(3, (px, py) => planetRing(px, py) && py < 25);
   p.fill(
-    (_, y) => [0, 1, 2][Math.floor((y - 11) / 4) % 3]!,
+    (_x, _y, _px, py) => [0, 1, 2][Math.floor((py - 11) / 4) % 3]!,
     (px, py) => Math.hypot(px - 24, py - 25) <= 13.5,
   );
   p.fill(3, (px, py) => planetRing(px, py) && py >= 25);
@@ -261,19 +269,19 @@ export function planet(): Art {
 }
 
 export function argyle(): Art {
-  const d = 12;
-  return new Painter(48)
+  const d = 10;
+  return new Painter(50)
     .fill((x, y) => {
       const u = Math.floor((x + 0.5 + y + 0.5) / d);
-      const v = Math.floor((x + 0.5 - (y + 0.5) + 48) / d);
-      if ((x + y + d / 2) % d === 0 || (x - y + 48 + d / 2) % d === 0) return 2;
+      const v = Math.floor((x + 0.5 - (y + 0.5) + 50) / d);
+      if ((x + y + d / 2) % d === 0 || (x - y + 50 + d / 2) % d === 0) return 2;
       return (u + v) % 2;
     })
     .toArt([C.navy, C.teal, C.yellow]);
 }
 
 export function house(): Art {
-  return new Painter(52)
+  return new Painter(50, 50, 52)
     .circle(45, 7, 4.5, 6)
     .rect(0, 44, 52, 8, 0)
     .rect(34, 9, 5, 12, 4)

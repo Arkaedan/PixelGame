@@ -13,6 +13,7 @@ import {
   type ShooterSpec,
   type TimedAction,
 } from '../../src/core/index.ts';
+import { balanceArt } from './balance.ts';
 import { createRng, pickWeighted, randomInt, type Rng } from './rng.ts';
 import { lapHits, playGreedy, runUntilIdle } from './sim.ts';
 
@@ -50,6 +51,8 @@ const PRESETS: Record<Difficulty, Preset> = {
 };
 
 const MAX_ATTEMPTS = 30;
+/** Every shooter's ammo is a multiple of this. */
+export const AMMO_UNIT = 10;
 
 export interface BuildStats {
   shooters: number;
@@ -64,15 +67,25 @@ export interface BuildStats {
 }
 
 /**
- * Build a level from a spec: try seeded candidates until one meets the difficulty's rating
- * requirement. Every returned level has a verified no-power-up solution.
+ * Build a level from a spec: balance the art so every colour's pixel count is a multiple of
+ * AMMO_UNIT, then try seeded candidates until one meets the difficulty's rating requirement.
+ * Every returned level has a verified no-power-up solution.
  */
 export function generateLevel(spec: LevelSpec): { data: LevelData; stats: BuildStats } {
   const preset = PRESETS[spec.difficulty];
+  const balanced = { ...spec, art: balanceArt(spec.art, AMMO_UNIT, spec.seed) };
   let fallback: { data: LevelData; stats: BuildStats } | undefined;
+  let lastError: unknown;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const rng = createRng(spec.seed * 1000 + attempt);
-    const data = buildCandidate(spec, preset, rng);
+    let data: LevelData;
+    try {
+      data = buildCandidate(balanced, preset, rng);
+    } catch (error) {
+      // The builder can paint itself into a corner (e.g. a full buffer); try another seed.
+      lastError = error;
+      continue;
+    }
     const check = verifySolution(parseLevel(data), data.solution!);
     if (!check.ok) throw new Error(`${spec.name}: generated solution fails: ${check.reason}`);
 
@@ -82,7 +95,8 @@ export function generateLevel(spec: LevelSpec): { data: LevelData; stats: BuildS
     if (met) return { data, stats };
     fallback ??= { data, stats: { ...stats, metTarget: false } };
   }
-  return fallback!;
+  if (!fallback) throw new Error(`${spec.name}: every attempt failed`, { cause: lastError });
+  return fallback;
 }
 
 /** One seeded attempt. See docs/SPEC.md §6.3 for the approach. */
@@ -116,7 +130,14 @@ function buildCandidate(spec: LevelSpec, preset: Preset, rng: Rng): LevelData {
     const buffered = state.buffer.flatMap((s, slot) =>
       s && hits[s.color]! > 0 ? [{ slot, hits: Math.min(hits[s.color]!, s.ammo) }] : [],
     );
-    const fresh = art.palette.flatMap((_, c) => (hits[c]! > 0 && remaining[c]! > reserved[c]! ? [c] : []));
+    const parked = state.buffer.filter((s) => s !== null).length;
+    // A colour with fewer than AMMO_UNIT pixels reachable this lap can still get a shooter, but it
+    // will come back to the buffer, so there must be room for it.
+    const fresh = art.palette.flatMap((_, c) =>
+      hits[c]! > 0 && remaining[c]! > reserved[c]! && (hits[c]! >= AMMO_UNIT || parked < state.buffer.length)
+        ? [c]
+        : [],
+    );
     if (!buffered.length && !fresh.length) throw new Error(`${spec.name}: builder has no move`);
 
     if (buffered.length && (!fresh.length || rng() < 0.6)) {
@@ -126,10 +147,16 @@ function buildCandidate(spec: LevelSpec, preset: Preset, rng: Rng): LevelData {
     } else {
       const c = pickWeighted(rng, fresh, (col) => hits[col]! ** preset.greed);
       const lap = hits[c]!;
+      // Both are multiples of AMMO_UNIT, since balanced pixel counts and all ammo are.
       const available = remaining[c]! - reserved[c]!;
-      const parked = state.buffer.filter((s) => s !== null).length;
-      const overshoot = parked < preset.maxBuffer && available > lap && rng() < preset.bufferUse;
-      const ammo = overshoot ? pickRound(rng, lap + 1, available) : roundDown(Math.min(lap, available));
+      let ammo: number;
+      if (parked < preset.maxBuffer && available > lap && rng() < preset.bufferUse) {
+        ammo = pickRound(rng, lap + 1, available); // deliberately more than a lap's worth
+      } else if (lap >= AMMO_UNIT) {
+        ammo = Math.floor(Math.min(lap, available) / AMMO_UNIT) * AMMO_UNIT; // runs dry this lap
+      } else {
+        ammo = AMMO_UNIT; // too few targets for a full shooter: it has to come round again
+      }
       steps.push({ tick: state.tick, action: { type: 'new', index: order.length } });
       order.push({ c, a: ammo });
       state.pending.push({ id: nextId++, color: c, ammo, hidden: false });
@@ -183,25 +210,13 @@ function countByColour(state: GameState, colours: number): number[] {
   return counts;
 }
 
-/** Largest round number (multiple of 10, then 5) not above n, or n itself when small. */
-function roundDown(n: number): number {
-  if (n >= 10) return Math.floor(n / 10) * 10;
-  if (n >= 5) return 5;
-  return n;
-}
-
-/** A round number in [lo, hi] if there is one (preferring the lower half), else a random value. */
+/** A multiple of AMMO_UNIT in [lo, hi], preferring the lower half. `hi` must be a multiple. */
 function pickRound(rng: Rng, lo: number, hi: number): number {
-  for (const unit of [10, 5]) {
-    const options: number[] = [];
-    for (let v = Math.ceil(lo / unit) * unit; v <= hi; v += unit) options.push(v);
-    if (options.length) {
-      const lower = options.filter((v) => v <= lo + (hi - lo) / 2);
-      const pool = lower.length ? lower : options;
-      return pool[randomInt(rng, 0, pool.length - 1)]!;
-    }
-  }
-  return randomInt(rng, lo, hi);
+  const options: number[] = [];
+  for (let v = Math.ceil(lo / AMMO_UNIT) * AMMO_UNIT; v <= hi; v += AMMO_UNIT) options.push(v);
+  const lower = options.filter((v) => v <= lo + (hi - lo) / 2);
+  const pool = lower.length ? lower : options;
+  return pool[randomInt(rng, 0, pool.length - 1)]!;
 }
 
 function measure(data: LevelData): Omit<BuildStats, 'greedyWon' | 'attempt' | 'metTarget'> {

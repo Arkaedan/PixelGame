@@ -52,7 +52,7 @@ A phone-first puzzle game: clear a pixel-art grid by sending coloured shooters a
 ### 2.5 Ammo
 
 - For each colour, **total ammo exactly equals the number of pixels** of that colour. Ammo is only spent on hits.
-- Ammo values are round (multiples of 5 or 10) where possible. When a colour's pixel count doesn't divide evenly, one shooter of that colour holds the remainder.
+- **Every shooter's ammo is a multiple of 10.** To make that possible, the generator adjusts each colour's pixel count to a multiple of 10 (see §6.3).
 
 ### 2.6 Pacing
 
@@ -105,7 +105,7 @@ Pick Any together with Reveal lets you take any shooter in the queue.
 
 ### 6.1 Size
 
-- Boards range from **24×24 to 60×60**, not necessarily square. Empty background cells are allowed, so pixel art keeps its silhouette.
+- Boards are square: **30×30, 40×40, 50×50 or 60×60**. Empty background cells are allowed, so pixel art keeps its silhouette.
 - Colours: about 2–3 on early levels, rising to roughly 8.
 
 ### 6.2 Level file (JSON)
@@ -143,7 +143,7 @@ The code is in `tools/generate/`. `pnpm levels` rebuilds `levels/*.json` from th
   - merges colours closer than a minimum distance, so players can tell them apart.
 - **Construction** (`build.ts`, one seeded attempt): from an idle board, the builder repeatedly does one of two things:
   - **Redeploy** a buffered shooter that has targets.
-  - **Create a new shooter.** Its colour is picked at random, weighted by pixels hit per lap raised to the preset's _greed_. It normally carries at most one lap's worth of ammo, rounded to 10s or 5s, so it runs out on the track. With probability _bufferUse_ (while fewer than _maxBuffer_ are parked) it carries more, so it must go to the buffer and be sent out again later. A colour never gets more ammo than it has pixels left, so totals match pixel counts exactly.
+  - **Create a new shooter.** Its colour is picked at random, weighted by pixels hit per lap raised to the preset's _greed_. Ammo is always a multiple of 10. It normally carries at most one lap's worth, rounded down to 10s, so it runs out on the track. If fewer than 10 of that colour's pixels can be hit this lap, it carries 10 anyway and has to park in the buffer and go round again (only when there's a free buffer slot). With probability _bufferUse_ (while fewer than _maxBuffer_ are parked) it carries more, so it must go to the buffer and be sent out again later. A colour never gets more ammo than it has pixels left, so totals match pixel counts exactly.
 
   New shooters are then dealt into random columns in deploy order, with column lengths kept within 1 of each other. That keeps every recorded deploy at the front of a column. A fraction (_mystery_) of shooters not at a column front become mystery shooters.
 
@@ -156,7 +156,9 @@ The code is in `tools/generate/`. `pnpm levels` rebuilds `levels/*.json` from th
 | medium | 1     | 0.25      | 2         | 5%      | either             |
 | hard   | 0.5   | 0.6       | 4         | 12%     | lose               |
 
-- **Starter levels**: 15 levels from 24×24 to 60×60: 4 easy, 5 medium and 6 hard. Level 14 (Mountains) is imported from `art/mountains.png`; the rest are drawn in code.
+- **Balancing** (`balance.ts`, before construction): every colour's pixel count is made a multiple of 10 by moving single pixels across region edges. A pixel on the edge between colours A and B is recoloured, and pixels are passed along a chain of touching regions (including the background) when colours with leftovers don't touch. Art without background needs an area that is a multiple of 10, which every allowed board size has. Usually only a handful of edge pixels per colour change.
+- If an attempt paints itself into a corner (for example the buffer is full and nothing can make progress), it is dropped and the next seed is tried.
+- **Starter levels**: 15 levels, at 30×30 (4 easy), 40×40 (5 medium), 50×50 (4 hard) and 60×60 (2 hard). Level 14 (Mountains) is imported from `art/mountains.png`; the rest are drawn in code.
 
 ### 6.4 Editor (PC dev tool, later milestone)
 

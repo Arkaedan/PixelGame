@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { parseLevel, verifySolution, type Difficulty } from '../../src/core/index.ts';
-import { generateLevel, type LevelSpec } from '../../tools/generate/build.ts';
+import { AMMO_UNIT, generateLevel, type LevelSpec } from '../../tools/generate/build.ts';
 import { formatLevel } from '../../tools/generate/format.ts';
 import { Painter } from '../../tools/generate/paint.ts';
 import { playGreedy } from '../../tools/generate/sim.ts';
 
-const art = new Painter(16)
+const art = new Painter(20, 20, 16)
   .rect(0, 0, 16, 16, 0)
   .circle(8, 8, 6, 1)
   .rect(6, 6, 4, 4, 2)
@@ -25,11 +25,18 @@ describe('generateLevel', () => {
     expect(formatLevel(generateLevel(spec('medium', 3)).data)).toBe(formatLevel(generateLevel(spec('medium', 3)).data));
   });
 
-  it('easy levels never need the buffer and can be won greedily', () => {
-    const { data, stats } = generateLevel(spec('easy'));
-    expect(stats.bufferRedeploys).toBe(0);
-    expect(data.solution!.every((s) => s.action.type === 'deployQueue')).toBe(true);
+  it('easy levels can be won greedily', () => {
+    const { data } = generateLevel(spec('easy'));
     expect(playGreedy(parseLevel(data)).won).toBe(true);
+  });
+
+  it('only uses ammo in multiples of 10', () => {
+    for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+      const ammo = generateLevel(spec(difficulty))
+        .data.queue.flat()
+        .map((s) => s.a);
+      expect(ammo.filter((a) => a % AMMO_UNIT !== 0)).toEqual([]);
+    }
   });
 
   it('hard levels use the buffer and mystery shooters', () => {

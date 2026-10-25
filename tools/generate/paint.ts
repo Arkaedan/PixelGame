@@ -3,17 +3,22 @@ import type { Art } from './build.ts';
 type Pt = [number, number];
 
 /**
- * Tiny raster painter for level art. Coordinates are in cells; a cell is inside a shape when its
- * centre (x + 0.5, y + 0.5) is. Later shapes paint over earlier ones.
+ * Tiny raster painter for level art. Shapes are given in "design" coordinates, which are cells
+ * unless `designSize` says otherwise: then a drawing made for a designSize×designSize grid is
+ * scaled to fit this one. A cell is inside a shape when its centre is. Later shapes paint over
+ * earlier ones.
  */
 export class Painter {
   readonly width: number;
   readonly height: number;
   private readonly cells: Int8Array;
+  /** Design units per cell. */
+  private readonly unit: number;
 
-  constructor(width: number, height = width) {
+  constructor(width: number, height = width, designSize = width) {
     this.width = width;
     this.height = height;
+    this.unit = designSize / width;
     this.cells = new Int8Array(width * height).fill(-1);
   }
 
@@ -27,11 +32,19 @@ export class Painter {
     return this;
   }
 
-  /** Paint every cell whose centre passes `test`. `c` may depend on the cell. */
-  fill(c: number | ((x: number, y: number) => number), test: (px: number, py: number) => boolean = () => true): this {
+  /**
+   * Paint every cell whose centre (in design coordinates) passes `test`. `c` may depend on the
+   * cell: it gets the cell's indices and its centre in design coordinates.
+   */
+  fill(
+    c: number | ((x: number, y: number, px: number, py: number) => number),
+    test: (px: number, py: number) => boolean = () => true,
+  ): this {
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
-        if (test(x + 0.5, y + 0.5)) this.set(x, y, typeof c === 'number' ? c : c(x, y));
+        const px = (x + 0.5) * this.unit;
+        const py = (y + 0.5) * this.unit;
+        if (test(px, py)) this.set(x, y, typeof c === 'number' ? c : c(x, y, px, py));
       }
     }
     return this;
