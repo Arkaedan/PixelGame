@@ -97,6 +97,7 @@ Pick Any together with Reveal lets you take any shooter in the queue.
 - **Result card**: on a win it shows the power-ups used, the time, and either "First clear!", "New best!" (with the previous best) or your existing best. On a loss it shows the reason and your best, if any.
 - **Linear unlock**: clearing a level with any number of power-ups unlocks the next. Any unlocked level can be replayed.
 - Progress is saved locally on the device (`localStorage`, key `pixelgame.progress.v1`). No accounts. If storage is unavailable, progress lasts for the session.
+- **Reset all data** (⚙ Settings → Reset all data…) deletes every record, unlock and setting on the device after a confirmation step, then returns to the level list with only level 1 open.
 - For testing, adding `?all` to the URL opens every level without changing saved progress.
 
 ---

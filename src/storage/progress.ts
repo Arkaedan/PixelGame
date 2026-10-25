@@ -22,6 +22,7 @@ interface SavedProgress {
 export interface KeyValueStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 const KEY = 'pixelgame.progress.v1';
@@ -86,6 +87,16 @@ export class ProgressStore {
     };
     this.save();
     return { isNewBest, previous: existing?.best };
+  }
+
+  /** Forget every record and unlock, here and in storage. */
+  clear(): void {
+    this.data = { version: 1, levels: {} };
+    try {
+      this.store?.removeItem(KEY);
+    } catch {
+      // Storage blocked: nothing was saved there anyway.
+    }
   }
 
   private save(): void {

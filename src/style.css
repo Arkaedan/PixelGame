@@ -486,3 +486,51 @@ button {
   margin-bottom: 14px;
   text-align: left;
 }
+
+/* Reset all data */
+
+.reset {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-2);
+}
+
+.danger-link {
+  padding: 8px 0;
+  background: none;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.reset.confirm p {
+  margin: 0 0 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.reset.confirm .actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card .actions button.danger,
+.reset .actions button.danger {
+  background: var(--danger);
+  color: #0c0e13;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 20;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.4);
+  animation: rise-in 200ms ease-out;
+}

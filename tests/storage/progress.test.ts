@@ -9,6 +9,9 @@ function memoryStore(initial: Record<string, string> = {}): KeyValueStore & { da
     setItem: (k, v) => {
       data[k] = v;
     },
+    removeItem: (k) => {
+      delete data[k];
+    },
   };
 }
 
@@ -52,6 +55,18 @@ describe('ProgressStore', () => {
     expect([0, 1, 2].map((i) => progress.isUnlocked(ids, i))).toEqual([true, true, false]);
   });
 
+  it('clear() forgets every record and unlock, also after a reload', () => {
+    const store = memoryStore();
+    const progress = new ProgressStore(store);
+    progress.recordClear('001', record(0, 0, 100));
+    progress.recordClear('002', record(1, 0, 100));
+    progress.clear();
+    expect(progress.get('001')).toBeUndefined();
+    expect(progress.isUnlocked(['001', '002', '003'], 1)).toBe(false);
+    expect(store.data).toEqual({});
+    expect(new ProgressStore(store).get('002')).toBeUndefined();
+  });
+
   it('ignores corrupt or unexpected saved data', () => {
     for (const raw of ['not json', '{"version":2,"levels":{}}', '{"version":1,"levels":{"001":{"clears":"x"}}}']) {
       const progress = new ProgressStore(memoryStore({ 'pixelgame.progress.v1': raw }));
@@ -70,6 +85,9 @@ describe('ProgressStore', () => {
       },
       setItem: () => {
         throw new Error('quota');
+      },
+      removeItem: () => {
+        throw new Error('blocked');
       },
     };
     const progress = new ProgressStore(broken);

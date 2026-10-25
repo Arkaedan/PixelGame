@@ -4,7 +4,11 @@ import { DEFAULT_SETTINGS, SettingsStore } from '../../src/storage/settings.ts';
 
 function memoryStore(initial: Record<string, string> = {}): KeyValueStore {
   const data = { ...initial };
-  return { getItem: (k) => data[k] ?? null, setItem: (k, v) => void (data[k] = v) };
+  return {
+    getItem: (k) => data[k] ?? null,
+    setItem: (k, v) => void (data[k] = v),
+    removeItem: (k) => void delete data[k],
+  };
 }
 
 describe('SettingsStore', () => {
@@ -13,6 +17,14 @@ describe('SettingsStore', () => {
     expect(new SettingsStore(store).get()).toEqual(DEFAULT_SETTINGS);
     new SettingsStore(store).update({ sound: false, speed: 4 });
     expect(new SettingsStore(store).get()).toEqual({ sound: false, haptics: true, speed: 4 });
+  });
+
+  it('clear() restores the defaults, also after a reload', () => {
+    const store = memoryStore();
+    const settings = new SettingsStore(store);
+    settings.update({ sound: false, haptics: false, speed: 2 });
+    expect(settings.clear()).toEqual(DEFAULT_SETTINGS);
+    expect(new SettingsStore(store).get()).toEqual(DEFAULT_SETTINGS);
   });
 
   it('falls back to defaults for missing, invalid or corrupt values', () => {

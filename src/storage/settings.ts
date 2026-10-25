@@ -43,6 +43,17 @@ export class SettingsStore {
     }
     return this.get();
   }
+
+  /** Back to the defaults, here and in storage. */
+  clear(): Settings {
+    this.current = { ...DEFAULT_SETTINGS };
+    try {
+      this.store?.removeItem(KEY);
+    } catch {
+      // Storage blocked: nothing was saved there anyway.
+    }
+    return this.get();
+  }
 }
 
 function load(store: KeyValueStore | undefined): Settings {

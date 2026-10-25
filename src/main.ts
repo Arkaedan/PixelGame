@@ -77,11 +77,21 @@ function play(index: number): void {
   });
 }
 
-/** A sheet over the level list with sound, vibration and starting speed. */
+/** A sheet over the level list with sound, vibration, starting speed and resetting all data. */
 function showSettings(): void {
   const sheet = document.createElement('div');
   sheet.className = 'sheet';
+  let confirmingReset = false;
   const render = (s: Settings): void => {
+    const reset = confirmingReset
+      ? `<div class="reset confirm" role="alert">
+          <p><b>Delete all data?</b> This clears every record, unlocked level and setting on this device. It can't be undone.</p>
+          <div class="actions">
+            <button class="danger" data-act="reset-confirm">Delete everything</button>
+            <button data-act="reset-cancel">Cancel</button>
+          </div>
+        </div>`
+      : '<div class="reset"><button class="danger-link" data-act="reset">Reset all data…</button></div>';
     sheet.innerHTML = `
       <div class="card settings" role="dialog" aria-label="Settings">
         <h2>Settings</h2>
@@ -94,6 +104,7 @@ function showSettings(): void {
               .join('')}
           </div>
         </div>
+        ${reset}
         <div class="actions"><button class="primary" data-act="close">Done</button></div>
       </div>`;
   };
@@ -104,9 +115,31 @@ function showSettings(): void {
     const speed = e.target.closest<HTMLElement>('[data-speed]')?.dataset['speed'];
     const chosen = speed === '1' ? 1 : speed === '2' ? 2 : speed === '4' ? 4 : undefined;
     if (chosen) render(settings.update({ speed: chosen }));
-    if (e.target === sheet || e.target.closest('[data-act="close"]')) sheet.remove();
+    const act = e.target.closest<HTMLElement>('[data-act]')?.dataset['act'];
+    if (act === 'reset' || act === 'reset-cancel') {
+      confirmingReset = act === 'reset';
+      render(settings.get());
+    } else if (act === 'reset-confirm') {
+      progress.clear();
+      sfx.enabled = settings.clear().sound;
+      sheet.remove();
+      showMenu();
+      toast('All data cleared');
+    } else if (e.target === sheet || act === 'close') {
+      sheet.remove();
+    }
   });
   app.append(sheet);
+}
+
+/** A short message at the bottom of the screen. */
+function toast(message: string): void {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = message;
+  app.append(el);
+  setTimeout(() => el.remove(), 2500);
 }
 
 /** Level art at one pixel per cell; locked levels show only a silhouette. */
