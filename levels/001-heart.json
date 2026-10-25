@@ -38,27 +38,31 @@
     ".............................."
   ],
   "queue": [
-    [{"c":2,"a":70},{"c":1,"a":10},{"c":0,"a":20}],
-    [{"c":0,"a":80},{"c":0,"a":70},{"c":0,"a":40}],
-    [{"c":0,"a":40},{"c":0,"a":20},{"c":1,"a":10}],
-    [{"c":0,"a":70},{"c":0,"a":10},{"c":1,"a":10}],
-    [{"c":0,"a":50},{"c":0,"a":30},{"c":2,"a":10}]
+    [{"c":0,"a":40},{"c":0,"a":40},{"c":1,"a":10}],
+    [{"c":2,"a":40},{"c":0,"a":40},{"c":0,"a":30},{"c":1,"a":10}],
+    [{"c":0,"a":40},{"c":0,"a":40},{"c":0,"a":40},{"c":0,"a":20}],
+    [{"c":0,"a":40},{"c":1,"a":10},{"c":0,"a":10}],
+    [{"c":2,"a":40},{"c":0,"a":40},{"c":0,"a":40},{"c":0,"a":10}]
   ],
   "solution": [
-    {"tick":0,"action":{"type":"deployQueue","column":0}},
-    {"tick":88,"action":{"type":"deployQueue","column":1}},
-    {"tick":206,"action":{"type":"deployQueue","column":1}},
-    {"tick":313,"action":{"type":"deployQueue","column":3}},
-    {"tick":431,"action":{"type":"deployQueue","column":4}},
-    {"tick":535,"action":{"type":"deployQueue","column":2}},
-    {"tick":641,"action":{"type":"deployQueue","column":1}},
-    {"tick":758,"action":{"type":"deployQueue","column":4}},
-    {"tick":873,"action":{"type":"deployQueue","column":2}},
-    {"tick":951,"action":{"type":"deployQueue","column":0}},
-    {"tick":1024,"action":{"type":"deployQueue","column":0}},
-    {"tick":1136,"action":{"type":"deployQueue","column":2}},
-    {"tick":1211,"action":{"type":"deployQueue","column":4}},
-    {"tick":1321,"action":{"type":"deployQueue","column":3}},
-    {"tick":1431,"action":{"type":"deployQueue","column":3}}
+    {"tick":0,"action":{"type":"deployQueue","column":4}},
+    {"tick":51,"action":{"type":"deployQueue","column":1}},
+    {"tick":161,"action":{"type":"deployQueue","column":1}},
+    {"tick":214,"action":{"type":"deployQueue","column":4}},
+    {"tick":268,"action":{"type":"deployQueue","column":0}},
+    {"tick":323,"action":{"type":"deployQueue","column":0}},
+    {"tick":379,"action":{"type":"deployQueue","column":2}},
+    {"tick":436,"action":{"type":"deployQueue","column":2}},
+    {"tick":505,"action":{"type":"deployQueue","column":3}},
+    {"tick":586,"action":{"type":"deployQueue","column":4}},
+    {"tick":686,"action":{"type":"deployQueue","column":2}},
+    {"tick":794,"action":{"type":"deployQueue","column":1}},
+    {"tick":902,"action":{"type":"deployQueue","column":3}},
+    {"tick":958,"action":{"type":"deployQueue","column":2}},
+    {"tick":1062,"action":{"type":"deployQueue","column":4}},
+    {"tick":1138,"action":{"type":"deployQueue","column":3}},
+    {"tick":1218,"action":{"type":"deployQueue","column":0}},
+    {"tick":1290,"action":{"type":"deployQueue","column":1}},
+    {"tick":1415,"action":{"type":"deployBuffer","slot":4}}
   ]
 }

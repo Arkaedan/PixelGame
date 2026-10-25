@@ -29,6 +29,6 @@ Levels are listed in [tools/generate/levels.ts](tools/generate/levels.ts). Each 
 - **From a PNG:** put the image in `art/` and use `importPng(join(artDir, 'my-image.png'), { size: 40, maxColours: 6 })`. `size` is the board's longer side in cells; transparent areas become empty.
 - **Drawn in code:** add a function to [tools/generate/art.ts](tools/generate/art.ts) using `Painter` (rectangles, circles, ellipses, polygons, outlines).
 
-Boards must be 30×30, 40×40, 50×50 or 60×60 (for a PNG, set `size` to one of those). The generator adjusts a few edge pixels so each colour's pixel count is a multiple of 10, which lets every shooter's ammo be a multiple of 10.
+Boards must be 30×30, 40×40, 50×50 or 60×60 (for a PNG, set `size` to one of those). The generator adjusts a few edge pixels so each colour's pixel count is a multiple of 10, which lets every shooter's ammo be 10, 20, 30 or 40 (`AMMO_UNIT` and `MAX_AMMO` in `tools/generate/build.ts`).
 
 Then run `pnpm levels <id>`. It prints stats, including whether the difficulty target was met. If it wasn't, try another seed.

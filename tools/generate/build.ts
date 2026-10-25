@@ -38,6 +38,11 @@ interface Preset {
   bufferUse: number;
   /** Most shooters the builder parks in the buffer at once. */
   maxBuffer: number;
+  /**
+   * Chance, each move, of sending a shooter whose colour can't be hit yet. It parks in the buffer
+   * until the colours in front of it are cleared, so the player has to plan for it.
+   */
+  earlyUse: number;
   /** Fraction of shooters (not at a column front) that are mystery shooters. */
   mystery: number;
   /** Whether the greedy rating player must win, must lose, or either. */
@@ -45,14 +50,16 @@ interface Preset {
 }
 
 const PRESETS: Record<Difficulty, Preset> = {
-  easy: { greed: 3, bufferUse: 0, maxBuffer: 0, mystery: 0, greedy: 'win' },
-  medium: { greed: 1, bufferUse: 0.25, maxBuffer: 2, mystery: 0.05, greedy: 'any' },
-  hard: { greed: 0.5, bufferUse: 0.6, maxBuffer: 4, mystery: 0.12, greedy: 'lose' },
+  easy: { greed: 3, bufferUse: 0, maxBuffer: 0, earlyUse: 0, mystery: 0, greedy: 'win' },
+  medium: { greed: 1, bufferUse: 0.25, maxBuffer: 2, earlyUse: 0, mystery: 0.05, greedy: 'any' },
+  hard: { greed: 0.5, bufferUse: 0.6, maxBuffer: 4, earlyUse: 0.15, mystery: 0.12, greedy: 'lose' },
 };
 
 const MAX_ATTEMPTS = 30;
 /** Every shooter's ammo is a multiple of this. */
 export const AMMO_UNIT = 10;
+/** No shooter carries more than this. */
+export const MAX_AMMO = 40;
 
 export interface BuildStats {
   shooters: number;
@@ -139,8 +146,15 @@ function buildCandidate(spec: LevelSpec, preset: Preset, rng: Rng): LevelData {
         : [],
     );
     if (!buffered.length && !fresh.length) throw new Error(`${spec.name}: builder has no move`);
+    const unreachable = art.palette.flatMap((_, c) => (hits[c] === 0 && remaining[c]! > reserved[c]! ? [c] : []));
 
-    if (buffered.length && (!fresh.length || rng() < 0.6)) {
+    if (unreachable.length && parked < preset.maxBuffer && rng() < preset.earlyUse) {
+      const c = unreachable[randomInt(rng, 0, unreachable.length - 1)]!;
+      const ammo = pickRound(rng, AMMO_UNIT, Math.min(remaining[c]! - reserved[c]!, MAX_AMMO));
+      steps.push({ tick: state.tick, action: { type: 'new', index: order.length } });
+      order.push({ c, a: ammo });
+      state.pending.push({ id: nextId++, color: c, ammo, hidden: false });
+    } else if (buffered.length && (!fresh.length || rng() < 0.6)) {
       const { slot } = pickWeighted(rng, buffered, (b) => b.hits ** preset.greed);
       steps.push({ tick: state.tick, action: { type: 'deployBuffer', slot } });
       applyOrThrow(state, { type: 'deployBuffer', slot });
@@ -150,10 +164,11 @@ function buildCandidate(spec: LevelSpec, preset: Preset, rng: Rng): LevelData {
       // Both are multiples of AMMO_UNIT, since balanced pixel counts and all ammo are.
       const available = remaining[c]! - reserved[c]!;
       let ammo: number;
-      if (parked < preset.maxBuffer && available > lap && rng() < preset.bufferUse) {
-        ammo = pickRound(rng, lap + 1, available); // deliberately more than a lap's worth
+      const cap = Math.min(available, MAX_AMMO);
+      if (parked < preset.maxBuffer && cap > lap && rng() < preset.bufferUse) {
+        ammo = pickRound(rng, lap + 1, cap); // deliberately more than a lap's worth
       } else if (lap >= AMMO_UNIT) {
-        ammo = Math.floor(Math.min(lap, available) / AMMO_UNIT) * AMMO_UNIT; // runs dry this lap
+        ammo = Math.floor(Math.min(lap, cap) / AMMO_UNIT) * AMMO_UNIT; // runs dry this lap
       } else {
         ammo = AMMO_UNIT; // too few targets for a full shooter: it has to come round again
       }

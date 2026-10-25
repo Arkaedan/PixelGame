@@ -52,7 +52,7 @@ A phone-first puzzle game: clear a pixel-art grid by sending coloured shooters a
 ### 2.5 Ammo
 
 - For each colour, **total ammo exactly equals the number of pixels** of that colour. Ammo is only spent on hits.
-- **Every shooter's ammo is a multiple of 10.** To make that possible, the generator adjusts each colour's pixel count to a multiple of 10 (see §6.3).
+- **Every shooter's ammo is 10, 20, 30 or 40**: a multiple of 10, at most 40. To make that possible, the generator adjusts each colour's pixel count to a multiple of 10 (see §6.3).
 
 ### 2.6 Pacing
 
@@ -143,7 +143,7 @@ The code is in `tools/generate/`. `pnpm levels` rebuilds `levels/*.json` from th
   - merges colours closer than a minimum distance, so players can tell them apart.
 - **Construction** (`build.ts`, one seeded attempt): from an idle board, the builder repeatedly does one of two things:
   - **Redeploy** a buffered shooter that has targets.
-  - **Create a new shooter.** Its colour is picked at random, weighted by pixels hit per lap raised to the preset's _greed_. Ammo is always a multiple of 10. It normally carries at most one lap's worth, rounded down to 10s, so it runs out on the track. If fewer than 10 of that colour's pixels can be hit this lap, it carries 10 anyway and has to park in the buffer and go round again (only when there's a free buffer slot). With probability _bufferUse_ (while fewer than _maxBuffer_ are parked) it carries more, so it must go to the buffer and be sent out again later. A colour never gets more ammo than it has pixels left, so totals match pixel counts exactly.
+  - **Create a new shooter.** Its colour is picked at random, weighted by pixels hit per lap raised to the preset's _greed_. Ammo is always 10, 20, 30 or 40. It normally carries at most one lap's worth, rounded down to 10s, so it runs out on the track. If fewer than 10 of that colour's pixels can be hit this lap, it carries 10 anyway and has to park in the buffer and go round again (only when there's a free buffer slot). With probability _bufferUse_ (while fewer than _maxBuffer_ are parked) it carries more, so it must go to the buffer and be sent out again later. A colour never gets more ammo than it has pixels left, so totals match pixel counts exactly.
 
   New shooters are then dealt into random columns in deploy order, with column lengths kept within 1 of each other. That keeps every recorded deploy at the front of a column. A fraction (_mystery_) of shooters not at a column front become mystery shooters.
 
@@ -156,9 +156,12 @@ The code is in `tools/generate/`. `pnpm levels` rebuilds `levels/*.json` from th
 | medium | 1     | 0.25      | 2         | 5%      | either             |
 | hard   | 0.5   | 0.6       | 4         | 12%     | lose               |
 
+Hard also has _earlyUse_ 0.15; easy and medium have 0.
+
 - **Balancing** (`balance.ts`, before construction): every colour's pixel count is made a multiple of 10 by moving single pixels across region edges. A pixel on the edge between colours A and B is recoloured, and pixels are passed along a chain of touching regions (including the background) when colours with leftovers don't touch. Art without background needs an area that is a multiple of 10, which every allowed board size has. Usually only a handful of edge pixels per colour change.
+- **Early shooters** (hard only, chance _earlyUse_ per move): a shooter whose colour can't be hit yet is sent out anyway, so it parks in the buffer until the colours in front of it are cleared. With ammo capped at 40, big boards rarely leave room for over-filled shooters, so this is the main source of buffer planning on hard levels.
 - If an attempt paints itself into a corner (for example the buffer is full and nothing can make progress), it is dropped and the next seed is tried.
-- **Starter levels**: 15 levels, at 30×30 (4 easy), 40×40 (5 medium), 50×50 (4 hard) and 60×60 (2 hard). Level 14 (Mountains) is imported from `art/mountains.png`; the rest are drawn in code.
+- **Starter levels**: 15 levels, at 30×30 (4 easy), 40×40 (5 medium), 50×50 (3 hard, 1 medium) and 60×60 (2 hard). Planet is labelled medium because, with ammo capped at 40, no seed tried made it beat the greedy player. Level 14 (Mountains) is imported from `art/mountains.png`; the rest are drawn in code.
 
 ### 6.4 Editor (PC dev tool, later milestone)
 

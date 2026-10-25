@@ -18,10 +18,10 @@ describe('bundled levels', () => {
     expect(verifySolution(level, data.solution ?? [])).toEqual({ ok: true });
   });
 
-  it.each(files)('%s is 30, 40, 50 or 60 square with ammo in multiples of 10', (file) => {
+  it.each(files)('%s is 30, 40, 50 or 60 square with ammo of 10, 20, 30 or 40', (file) => {
     const data: LevelData = JSON.parse(readFileSync(join(dir, file), 'utf8'));
     expect([30, 40, 50, 60]).toContain(data.width);
     expect(data.height).toBe(data.width);
-    expect(data.queue.flat().filter((s) => s.a % 10 !== 0)).toEqual([]);
+    expect(data.queue.flat().filter((s) => ![10, 20, 30, 40].includes(s.a))).toEqual([]);
   });
 });

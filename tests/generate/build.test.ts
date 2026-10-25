@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseLevel, verifySolution, type Difficulty } from '../../src/core/index.ts';
-import { AMMO_UNIT, generateLevel, type LevelSpec } from '../../tools/generate/build.ts';
+import { AMMO_UNIT, generateLevel, MAX_AMMO, type LevelSpec } from '../../tools/generate/build.ts';
 import { formatLevel } from '../../tools/generate/format.ts';
 import { Painter } from '../../tools/generate/paint.ts';
 import { playGreedy } from '../../tools/generate/sim.ts';
@@ -30,12 +30,12 @@ describe('generateLevel', () => {
     expect(playGreedy(parseLevel(data)).won).toBe(true);
   });
 
-  it('only uses ammo in multiples of 10', () => {
+  it('only uses ammo of 10, 20, 30 or 40', () => {
     for (const difficulty of ['easy', 'medium', 'hard'] as const) {
       const ammo = generateLevel(spec(difficulty))
         .data.queue.flat()
         .map((s) => s.a);
-      expect(ammo.filter((a) => a % AMMO_UNIT !== 0)).toEqual([]);
+      expect(ammo.filter((a) => a % AMMO_UNIT !== 0 || a > MAX_AMMO)).toEqual([]);
     }
   });
 
